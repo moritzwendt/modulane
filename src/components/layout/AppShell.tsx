@@ -1,7 +1,6 @@
 import {
   Bell,
   CaretDown,
-  CirclesFour,
   Cube,
   FolderSimple,
   GearSix,
@@ -22,6 +21,7 @@ import { Link, NavLink, useNavigate } from "react-router-dom"
 import { useAuth } from "../../state/AuthContext"
 import { useWorkspace } from "../../state/WorkspaceContext"
 import { Avatar } from "../ui/Avatar"
+import { BrandLogo } from "../ui/BrandLogo"
 import { Modal } from "../ui/Modal"
 
 const navigation = [
@@ -95,7 +95,7 @@ export function AppShell({ children, onCreateProject }: { children: ReactNode; o
       <a className="skip-link" href="#main-content">Zum Inhalt springen</a>
       <aside className={`sidebar ${sidebarOpen ? "sidebar-open" : ""}`}>
         <div className="workspace-switcher">
-          <span className="brand-mark"><CirclesFour size={18} weight="fill" /></span>
+          <span className="brand-mark"><BrandLogo /></span>
           <div>
             <strong>Modulane</strong>
             <span>{settings.name}</span>

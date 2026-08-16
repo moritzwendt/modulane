@@ -2,7 +2,6 @@ import {
   ArrowRight,
   ArrowUpRight,
   Check,
-  CirclesFour,
   Code,
   GitCommit,
   GitPullRequest,
@@ -17,6 +16,7 @@ import {
 } from "@phosphor-icons/react"
 import { useState } from "react"
 import { Link } from "react-router-dom"
+import { BrandLogo } from "../components/ui/BrandLogo"
 import { useAuth } from "../state/AuthContext"
 
 const maturityStates = [
@@ -38,7 +38,7 @@ export function LandingPage() {
   return (
     <div className="landing-page">
       <header className="landing-header">
-        <Link className="landing-logo" to="/" aria-label="Modulane Startseite"><span><CirclesFour size={18} weight="fill" /></span><strong>Modulane</strong></Link>
+        <Link className="landing-logo" to="/" aria-label="Modulane Startseite"><span><BrandLogo /></span><strong>Modulane</strong></Link>
         <nav className={mobileNavOpen ? "landing-nav open" : "landing-nav"} aria-label="Seitennavigation">
           <a href="#product" onClick={() => setMobileNavOpen(false)}>Produkt</a>
           <a href="#workflow" onClick={() => setMobileNavOpen(false)}>Arbeitsweise</a>
@@ -67,7 +67,7 @@ export function LandingPage() {
             <div className="window-bar"><div className="window-controls"><span /><span /><span /></div><div className="window-command"><span>Suchen</span><kbd>⌘ K</kbd></div><div className="window-avatar">MW</div></div>
             <div className="window-body">
               <aside className="window-sidebar">
-                <div className="window-workspace"><span><CirclesFour size={15} weight="fill" /></span><strong>SDX Solutions</strong></div>
+                <div className="window-workspace"><span><BrandLogo /></span><strong>SDX Solutions</strong></div>
                 <div className="window-nav-list"><span><Pulse size={15} />Übersicht</span><span className="selected"><ListChecks size={15} />Meine Appteile</span><span><UsersThree size={15} />Team</span></div>
                 <small>PROJEKTE</small>
                 <div className="window-project-list"><span><i className="nova">N</i>Nova Mobile</span><span><i className="atlas">A</i>Atlas Admin</span><span><i className="relay">R</i>Relay API</span></div>
@@ -135,7 +135,7 @@ export function LandingPage() {
         </section>
       </main>
 
-      <footer className="landing-footer"><Link className="landing-logo" to="/"><span><CirclesFour size={18} weight="fill" /></span><strong>Modulane</strong></Link><p>Produktklarheit für moderne Softwareteams.</p><nav><a href="#product">Produkt</a><a href="#workflow">Arbeitsweise</a><Link to="/login">Anmelden</Link></nav></footer>
+      <footer className="landing-footer"><Link className="landing-logo" to="/"><span><BrandLogo /></span><strong>Modulane</strong></Link><p>Produktklarheit für moderne Softwareteams.</p><nav><a href="#product">Produkt</a><a href="#workflow">Arbeitsweise</a><Link to="/login">Anmelden</Link></nav></footer>
     </div>
   )
 }

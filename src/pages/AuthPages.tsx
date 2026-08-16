@@ -1,13 +1,14 @@
-import { ArrowRight, Check, CirclesFour, Eye, EyeSlash, GitCommit, ShieldCheck, UsersThree } from "@phosphor-icons/react"
+import { ArrowRight, Check, Eye, EyeSlash, GitCommit, ShieldCheck, UsersThree } from "@phosphor-icons/react"
 import { useState, type FormEvent, type ReactNode } from "react"
 import { Link, Navigate, useNavigate } from "react-router-dom"
+import { BrandLogo } from "../components/ui/BrandLogo"
 import { useAuth } from "../state/AuthContext"
 
 export function AuthLayout({ title, description, children }: { title: string; description: string; children: ReactNode }) {
   return (
     <main className="auth-layout">
       <section className="auth-story" aria-label="Modulane Vorschau">
-        <div className="auth-brand"><span><CirclesFour size={19} weight="fill" /></span><strong>Modulane</strong></div>
+        <div className="auth-brand"><span><BrandLogo /></span><strong>Modulane</strong></div>
         <div className="auth-story-copy">
           <span className="auth-eyebrow">Arbeitszustand auf einen Blick</span>
           <h1>Jeder Appteil hat einen klaren Besitzer und einen echten Zustand.</h1>
