@@ -104,6 +104,34 @@ const edgeFunctionErrorMessage = async (error: unknown, fallback: string) => {
 
 export const joinCodeRoles: JoinCodeRole[] = ["Administrator", "Mitglied", "Gast"]
 
+const isUnauthorizedFunctionError = (error: unknown) => error && typeof error === "object" && "context" in error && error.context instanceof Response && error.context.status === 401
+
+const invokeWorkspaceOnboarding = async (body: Record<string, unknown>) => {
+  const sessionResult = await supabase.auth.getSession()
+  if (sessionResult.error || !sessionResult.data.session) throw new Error("Deine Anmeldung ist abgelaufen. Bitte melde dich erneut an.")
+
+  let session = sessionResult.data.session
+  if (session.expires_at && session.expires_at * 1000 <= Date.now() + 30_000) {
+    const refreshed = await supabase.auth.refreshSession()
+    if (refreshed.error || !refreshed.data.session) throw new Error("Deine Anmeldung ist abgelaufen. Bitte melde dich erneut an.")
+    session = refreshed.data.session
+  }
+
+  const invoke = (accessToken: string) => supabase.functions.invoke("workspace-onboarding", {
+    body,
+    headers: { Authorization: `Bearer ${accessToken}` },
+  })
+
+  let result = await invoke(session.access_token)
+  if (result.error && isUnauthorizedFunctionError(result.error)) {
+    const refreshed = await supabase.auth.refreshSession()
+    if (refreshed.error || !refreshed.data.session) throw new Error("Deine Anmeldung ist abgelaufen. Bitte melde dich erneut an.")
+    result = await invoke(refreshed.data.session.access_token)
+  }
+  if (result.error && isUnauthorizedFunctionError(result.error)) throw new Error("Deine Anmeldung konnte nicht bestätigt werden. Bitte melde dich erneut an.")
+  return result
+}
+
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const { user, isAuthenticated } = useAuth()
   const [data, setData] = useState<WorkspaceData>(emptyData)
@@ -276,20 +304,20 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     error,
     reload,
     async createWorkspace(name, role) {
-      const { data: result, error: functionError } = await supabase.functions.invoke("workspace-onboarding", { body: { action: "create", name, role } })
+      const { data: result, error: functionError } = await invokeWorkspaceOnboarding({ action: "create", name, role })
       if (functionError) throw new Error(await edgeFunctionErrorMessage(functionError, "Organisation konnte nicht erstellt werden."))
       if (result?.error) throw new Error(result.error)
       return { code: result.code, workspaceName: result.workspaceName, role: result.role, expiresAt: result.expiresAt }
     },
     async joinWorkspace(code) {
-      const { data: result, error: functionError } = await supabase.functions.invoke("workspace-onboarding", { body: { action: "join", code } })
+      const { data: result, error: functionError } = await invokeWorkspaceOnboarding({ action: "join", code })
       if (functionError) throw new Error(await edgeFunctionErrorMessage(functionError, "Organisation konnte nicht gefunden werden."))
       if (result?.error) throw new Error(result.error)
       await reload()
       return { workspaceName: result.workspaceName }
     },
     async rotateWorkspaceCode(role) {
-      const { data: result, error: functionError } = await supabase.functions.invoke("workspace-onboarding", { body: { action: "rotate", workspaceId, role } })
+      const { data: result, error: functionError } = await invokeWorkspaceOnboarding({ action: "rotate", workspaceId, role })
       if (functionError) throw new Error(await edgeFunctionErrorMessage(functionError, "Zugangscode konnte nicht erstellt werden."))
       if (result?.error) throw new Error(result.error)
       return { code: result.code, role: result.role, expiresAt: result.expiresAt }

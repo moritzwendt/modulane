@@ -1,11 +1,13 @@
-import { Bell, Buildings, Check, Copy, Key, UploadSimple, UserCircle } from "@phosphor-icons/react"
+import { Bell, Buildings, HourglassMedium, Key, UploadSimple, UserCircle } from "@phosphor-icons/react"
 import { useState, type FormEvent, type ReactNode } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
+import { AccessCodeCard } from "../components/ui/AccessCodeCard"
+import { AccessCodeRolePicker } from "../components/ui/AccessCodeRolePicker"
 import { Avatar } from "../components/ui/Avatar"
 import { IdentityImage } from "../components/ui/IdentityImage"
 import type { JoinCodeRole, ProjectStatus, WorkspaceVisibility } from "../domain/types"
 import { useAuth } from "../state/AuthContext"
-import { joinCodeRoles, projectStatuses, useWorkspace } from "../state/WorkspaceContext"
+import { projectStatuses, useWorkspace } from "../state/WorkspaceContext"
 import { useToast } from "../state/ToastContext"
 
 type SettingsTab = "Workspace" | "Konto" | "Benachrichtigungen"
@@ -25,7 +27,6 @@ export function SettingsPage() {
   const [accessCodeRole, setAccessCodeRole] = useState<JoinCodeRole>("Mitglied")
   const [accessCodeExpiresAt, setAccessCodeExpiresAt] = useState("")
   const [rotatingCode, setRotatingCode] = useState(false)
-  const [codeCopied, setCodeCopied] = useState(false)
   const [notificationSaveState, setNotificationSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle")
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [uploadingLogo, setUploadingLogo] = useState(false)
@@ -98,12 +99,6 @@ export function SettingsPage() {
     }
   }
 
-  const copyAccessCode = async () => {
-    await navigator.clipboard.writeText(accessCode.replace(/\s/g, ""))
-    setCodeCopied(true)
-    window.setTimeout(() => setCodeCopied(false), 1800)
-  }
-
   const saveNotificationPreference = async (key: "emailNotifications" | "weeklyDigest", value: boolean) => {
     const previousValue = workspaceInput[key]
     setWorkspaceInput((current) => ({ ...current, [key]: value }))
@@ -147,11 +142,11 @@ export function SettingsPage() {
                 <div className="field-group"><label htmlFor="default-project-status">Standardstatus für Projekte</label><select id="default-project-status" value={workspaceInput.defaultProjectStatus} onChange={(event) => setWorkspaceInput({ ...workspaceInput, defaultProjectStatus: event.target.value as ProjectStatus })}>{projectStatuses.map((status) => <option key={status}>{status}</option>)}</select></div>
                 <ToggleRow checked={workspaceInput.allowMemberInvites} onChange={(checked) => setWorkspaceInput({ ...workspaceInput, allowMemberInvites: checked })} title="Einladungen durch Mitglieder" description="Mitglieder dürfen weitere Personen in die Organisation einladen." />
               </SettingsSection>
-              {["Eigentümer", "Administrator"].includes(currentUser.role) && <SettingsSection title="Zugangscode" description="Mit diesem Code können neue Personen deiner Organisation beitreten.">
-                {accessCode ? <div className="access-code-result"><div className="access-code"><strong>{accessCode}</strong><button type="button" onClick={copyAccessCode}>{codeCopied ? <Check size={17} /> : <Copy size={17} />}{codeCopied ? "Kopiert" : "Kopieren"}</button></div><div className="access-code-meta"><span>Rolle: <strong>{accessCodeRole}</strong></span><span>Gültig bis <strong>{new Intl.DateTimeFormat("de-DE", { hour: "2-digit", minute: "2-digit" }).format(new Date(accessCodeExpiresAt))} Uhr</strong></span></div></div> : <div className="settings-code-empty"><Key size={19} /><span><strong>Kein sichtbarer Zugangscode</strong><small>Neue Codes werden einmalig angezeigt und laufen nach einer Stunde ab.</small></span></div>}
-                <div className="field-group access-code-role"><label htmlFor="access-code-role">Rolle für neue Mitglieder</label><select id="access-code-role" value={accessCodeRole} onChange={(event) => setAccessCodeRole(event.target.value as JoinCodeRole)}>{joinCodeRoles.map((role) => <option key={role}>{role}</option>)}</select><p className="field-helper">Die ausgewählte Rolle wird beim Beitritt automatisch vergeben.</p></div>
-                <p className="field-helper">Der Code ist eine Stunde gültig. Ein neuer Code macht den bisherigen sofort ungültig.</p>
-                <button className="button secondary" type="button" onClick={createAccessCode} disabled={rotatingCode}><Key size={16} />{rotatingCode ? "Code wird erstellt" : "Neuen Zugangscode erstellen"}</button>
+              {["Eigentümer", "Administrator"].includes(currentUser.role) && <SettingsSection title="Einladung per Zugangscode" description="Erstelle einen zeitlich begrenzten Zugang für neue Personen.">
+                <div className="access-code-settings">
+                  <div className="access-code-config"><div className="access-code-config-heading"><span>Neue Einladung</span><p>Lege fest, welche Rechte eine Person nach dem Beitritt erhält.</p></div><AccessCodeRolePicker value={accessCodeRole} onChange={setAccessCodeRole} /><div className="access-code-duration"><HourglassMedium size={17} /><span><strong>Eine Stunde gültig</strong><small>Ein neuer Code beendet sofort die Gültigkeit des vorherigen Codes.</small></span></div><button className="button primary access-code-create" type="button" onClick={createAccessCode} disabled={rotatingCode}><Key size={16} />{rotatingCode ? "Zugang wird erstellt" : "Zugangscode erstellen"}</button></div>
+                  <div className="access-code-preview">{accessCode ? <AccessCodeCard code={accessCode} role={accessCodeRole} expiresAt={accessCodeExpiresAt} /> : <div className="access-code-empty"><span><Key size={21} /></span><strong>Noch kein neuer Code</strong><p>Nach der Erstellung erscheint der Code einmalig an dieser Stelle.</p><small>Der lesbare Code wird nicht in der Datenbank gespeichert.</small></div>}</div>
+                </div>
               </SettingsSection>}
               <div className="settings-actions"><button className="button primary" type="submit">Änderungen speichern</button></div>
             </form>
