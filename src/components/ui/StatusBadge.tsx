@@ -1,6 +1,6 @@
-import type { FeatureStatus, Health, Priority, ProjectStatus } from "../../domain/types"
+import type { FeatureStatus, Health, Priority, ProjectStatus, ReleaseState } from "../../domain/types"
 
-type BadgeValue = FeatureStatus | Health | Priority | ProjectStatus
+type BadgeValue = FeatureStatus | Health | Priority | ProjectStatus | ReleaseState
 
 const toneByValue: Record<string, string> = {
   Idee: "neutral",
@@ -20,6 +20,11 @@ const toneByValue: Record<string, string> = {
   Keine: "neutral",
   "Im Plan": "green",
   Gefährdet: "amber",
+  Frei: "neutral",
+  "In Entwicklung": "violet",
+  Instabil: "red",
+  Stabil: "blue",
+  "Production Ready": "green",
 }
 
 export function StatusBadge({ value }: { value: BadgeValue }) {

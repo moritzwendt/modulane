@@ -24,6 +24,10 @@ export type FeatureStatus =
 export type Priority = "Dringend" | "Hoch" | "Normal" | "Niedrig" | "Keine"
 export type Health = "Im Plan" | "Gefährdet" | "Blockiert"
 export type FeatureRole = "Lead" | "Beteiligte" | "Review"
+export type UserRole = "Eigentümer" | "Administrator" | "Mitglied" | "Gast"
+export type ReleaseState = "Frei" | "In Entwicklung" | "Instabil" | "Stabil" | "Production Ready"
+export type WorkspaceVisibility = "Nur auf Einladung" | "Offen für die Organisation"
+export type ProjectVisibility = "Workspace" | "Privat"
 
 export interface User {
   id: string
@@ -32,7 +36,9 @@ export interface User {
   email: string
   initials: string
   color: string
-  role: "Eigentümer" | "Administrator" | "Mitglied"
+  role: UserRole
+  jobTitle: string
+  lastActiveAt: string
 }
 
 export interface FeatureMember {
@@ -54,6 +60,16 @@ export interface Update {
   health: Health
 }
 
+export interface FeatureCommit {
+  id: string
+  hash: string
+  message: string
+  branch: string
+  authorId: string
+  createdAt: string
+  url: string
+}
+
 export interface Feature {
   id: string
   projectId: string
@@ -63,12 +79,27 @@ export interface Feature {
   status: FeatureStatus
   priority: Priority
   health: Health
+  appPartId: string
   startDate: string
   targetDate: string
   estimate: string
   members: FeatureMember[]
   requirements: Requirement[]
   updates: Update[]
+  createdAt: string
+}
+
+export interface AppPart {
+  id: string
+  projectId: string
+  key: string
+  name: string
+  description: string
+  platform: string
+  releaseState: ReleaseState
+  ownerUserId: string
+  activeUserIds: string[]
+  commits: FeatureCommit[]
   createdAt: string
 }
 
@@ -82,14 +113,30 @@ export interface Project {
   color: string
   icon: string
   memberIds: string[]
+  visibility: ProjectVisibility
+  featurePrefix: string
+  repositoryName: string
+  autoArchiveDone: boolean
   createdAt: string
+}
+
+export interface WorkspaceSettings {
+  name: string
+  slug: string
+  visibility: WorkspaceVisibility
+  allowMemberInvites: boolean
+  emailNotifications: boolean
+  weeklyDigest: boolean
+  defaultProjectStatus: ProjectStatus
 }
 
 export interface WorkspaceData {
   users: User[]
   projects: Project[]
   features: Feature[]
+  appParts: AppPart[]
   currentUserId: string
+  settings: WorkspaceSettings
 }
 
 export interface ProjectInput {
@@ -109,4 +156,29 @@ export interface FeatureInput {
   priority: Priority
   targetDate: string
   memberIds: string[]
+  appPartId: string
+}
+
+export interface AppPartInput {
+  projectId: string
+  name: string
+  description: string
+  platform: string
+  releaseState: ReleaseState
+  ownerUserId: string
+}
+
+export interface UserInput {
+  name: string
+  email: string
+  role: UserRole
+  jobTitle: string
+}
+
+export interface CommitInput {
+  message: string
+  hash: string
+  branch: string
+  authorId: string
+  url: string
 }

@@ -6,7 +6,7 @@ import { Avatar } from "../ui/Avatar"
 import { Modal } from "../ui/Modal"
 
 export function CreateFeatureModal({ open, onClose, project }: { open: boolean; onClose(): void; project: Project }) {
-  const { users, createFeature } = useWorkspace()
+  const { users, appParts, createFeature } = useWorkspace()
   const navigate = useNavigate()
   const [input, setInput] = useState<FeatureInput>({
     projectId: project.id,
@@ -16,9 +16,11 @@ export function CreateFeatureModal({ open, onClose, project }: { open: boolean; 
     priority: "Normal",
     targetDate: "",
     memberIds: project.memberIds.slice(0, 1),
+    appPartId: "",
   })
   const [error, setError] = useState("")
   const projectUsers = users.filter((user) => project.memberIds.includes(user.id))
+  const projectAppParts = appParts.filter((appPart) => appPart.projectId === project.id)
 
   const toggleMember = (userId: string) => {
     setInput((current) => ({
@@ -27,7 +29,7 @@ export function CreateFeatureModal({ open, onClose, project }: { open: boolean; 
     }))
   }
 
-  const submit = (event: FormEvent) => {
+  const submit = async (event: FormEvent) => {
     event.preventDefault()
     if (!input.title.trim()) {
       setError("Bitte gib dem Feature einen Namen.")
@@ -37,8 +39,14 @@ export function CreateFeatureModal({ open, onClose, project }: { open: boolean; 
       setError("Wähle mindestens eine beteiligte Person aus.")
       return
     }
-    const feature = createFeature({ ...input, title: input.title.trim(), description: input.description.trim() })
-    setInput({ projectId: project.id, title: "", description: "", status: "Geplant", priority: "Normal", targetDate: "", memberIds: project.memberIds.slice(0, 1) })
+    let feature
+    try {
+      feature = await createFeature({ ...input, title: input.title.trim(), description: input.description.trim() })
+    } catch {
+      setError("Das Feature konnte nicht erstellt werden.")
+      return
+    }
+    setInput({ projectId: project.id, title: "", description: "", status: "Geplant", priority: "Normal", targetDate: "", memberIds: project.memberIds.slice(0, 1), appPartId: "" })
     setError("")
     onClose()
     navigate(`/projects/${project.id}/features/${feature.id}`)
@@ -73,6 +81,14 @@ export function CreateFeatureModal({ open, onClose, project }: { open: boolean; 
         <div className="field-group">
           <label htmlFor="feature-date">Zieltermin</label>
           <input id="feature-date" type="date" value={input.targetDate} onChange={(event) => setInput({ ...input, targetDate: event.target.value })} />
+        </div>
+        <div className="field-group">
+          <label htmlFor="feature-app-part">Betroffener App Teil</label>
+          <select id="feature-app-part" value={input.appPartId} onChange={(event) => setInput({ ...input, appPartId: event.target.value })}>
+            <option value="">Kein App Teil</option>
+            {projectAppParts.map((appPart) => <option key={appPart.id} value={appPart.id}>{appPart.name}</option>)}
+          </select>
+          <p className="field-helper">Optional. Die Verknüpfung zeigt im Produkt, warum gerade an diesem Bereich gearbeitet wird.</p>
         </div>
         <fieldset className="field-group">
           <legend>Beteiligte Personen</legend>

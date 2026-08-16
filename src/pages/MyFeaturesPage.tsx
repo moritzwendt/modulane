@@ -14,7 +14,7 @@ export function MyFeaturesPage() {
   return (
     <div className="page">
       <div className="page-header"><div><h1>Meine Features</h1><p>Alles, woran du beteiligt bist oder ein Review übernimmst.</p></div></div>
-      <div className="tab-row" role="tablist" aria-label="Feature Status">
+      <div className="tab-row" role="tablist" aria-label="Status der Features">
         {(["Offen", "Alle", ...featureStatuses] as const).map((item) => (
           <button key={item} type="button" className={status === item ? "active" : ""} onClick={() => setStatus(item)}>{item}</button>
         ))}

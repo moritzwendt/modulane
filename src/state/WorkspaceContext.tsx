@@ -1,5 +1,8 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
 import type {
+  AppPart,
+  AppPartInput,
+  CommitInput,
   Feature,
   FeatureInput,
   FeatureMember,
@@ -8,141 +11,392 @@ import type {
   Priority,
   Project,
   ProjectInput,
+  ProjectStatus,
   Requirement,
   Update,
+  UserInput,
+  UserRole,
   WorkspaceData,
+  WorkspaceSettings,
 } from "../domain/types"
-import { localWorkspaceRepository } from "../services/workspaceStorage"
+import { supabase } from "../lib/supabase"
+import { useAuth } from "./AuthContext"
 
 interface WorkspaceContextValue extends WorkspaceData {
-  createProject(input: ProjectInput): Project
-  createFeature(input: FeatureInput): Feature
-  updateFeature(featureId: string, updates: Partial<Feature>): void
-  toggleRequirement(featureId: string, requirementId: string): void
-  addRequirement(featureId: string, title: string): void
-  addUpdate(featureId: string, message: string, health: Health): void
-  setFeatureMembers(featureId: string, members: FeatureMember[]): void
-  setCurrentUser(userId: string): void
-  resetDemo(): void
+  workspaceId: string
+  loading: boolean
+  error: string
+  reload(): Promise<void>
+  createWorkspace(name: string): Promise<{ code: string; workspaceName: string }>
+  joinWorkspace(code: string): Promise<{ workspaceName: string }>
+  rotateWorkspaceCode(): Promise<string>
+  createProject(input: ProjectInput): Promise<Project>
+  createFeature(input: FeatureInput): Promise<Feature>
+  createAppPart(input: AppPartInput): Promise<AppPart>
+  updateProject(projectId: string, updates: Partial<Project>): Promise<void>
+  updateWorkspaceSettings(updates: Partial<WorkspaceSettings>): Promise<void>
+  updateFeature(featureId: string, updates: Partial<Feature>): Promise<void>
+  toggleRequirement(featureId: string, requirementId: string): Promise<void>
+  addRequirement(featureId: string, title: string): Promise<void>
+  addUpdate(featureId: string, message: string, health: Health): Promise<void>
+  setFeatureMembers(featureId: string, members: FeatureMember[]): Promise<void>
+  updateAppPart(appPartId: string, updates: Partial<AppPart>): Promise<void>
+  claimAppPart(appPartId: string): Promise<void>
+  setActiveAppPartUsers(appPartId: string, userIds: string[]): Promise<void>
+  addAppPartCommit(appPartId: string, input: CommitInput): Promise<void>
+  inviteUser(input: UserInput): Promise<void>
+  updateUserRole(userId: string, role: UserRole): Promise<void>
+  updateUser(userId: string, updates: Partial<UserInput>): Promise<void>
+}
+
+const emptySettings: WorkspaceSettings = {
+  name: "",
+  slug: "",
+  visibility: "Nur auf Einladung",
+  allowMemberInvites: false,
+  emailNotifications: true,
+  weeklyDigest: true,
+  defaultProjectStatus: "Geplant",
+}
+
+const emptyData: WorkspaceData = {
+  users: [],
+  projects: [],
+  features: [],
+  appParts: [],
+  currentUserId: "",
+  settings: emptySettings,
 }
 
 const WorkspaceContext = createContext<WorkspaceContextValue | null>(null)
 
-const createId = (prefix: string) => `${prefix}-${crypto.randomUUID()}`
-
 const projectCode = (project: Project, features: Feature[]) => {
-  const letters = project.name.replace(/[^A-Za-zÄÖÜäöüß]/g, "").slice(0, 3).toUpperCase()
   const count = features.filter((feature) => feature.projectId === project.id).length + 1
-  return `${letters || "MOD"} ${String(count).padStart(2, "0")}`
+  return `${project.featurePrefix || "MOD"} ${String(count).padStart(2, "0")}`
+}
+
+const appPartCode = (project: Project, appParts: AppPart[]) => {
+  const count = appParts.filter((appPart) => appPart.projectId === project.id).length + 1
+  return `${project.featurePrefix || "MOD"} P${String(count).padStart(2, "0")}`
+}
+
+const throwIfError = (error: { message: string } | null) => {
+  if (error) throw new Error(error.message)
 }
 
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
-  const [data, setData] = useState<WorkspaceData>(() => localWorkspaceRepository.load())
+  const { user, isAuthenticated } = useAuth()
+  const [data, setData] = useState<WorkspaceData>(emptyData)
+  const [workspaceId, setWorkspaceId] = useState("")
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
+
+  const reload = useCallback(async () => {
+    if (!user) {
+      setData(emptyData)
+      setWorkspaceId("")
+      setLoading(false)
+      return
+    }
+    setLoading(true)
+    setError("")
+    try {
+      const membershipResult = await supabase.from("workspace_members").select("workspace_id, role").eq("user_id", user.id).order("joined_at").limit(1).maybeSingle()
+      throwIfError(membershipResult.error)
+      if (!membershipResult.data) {
+        setData({ ...emptyData, currentUserId: user.id })
+        setWorkspaceId("")
+        return
+      }
+      const activeWorkspaceId = membershipResult.data.workspace_id
+      const [workspaceResult, membersResult, projectsResult] = await Promise.all([
+        supabase.from("workspaces").select("*").eq("id", activeWorkspaceId).single(),
+        supabase.from("workspace_members").select("user_id, role, joined_at").eq("workspace_id", activeWorkspaceId),
+        supabase.from("projects").select("*").eq("workspace_id", activeWorkspaceId).order("created_at"),
+      ])
+      throwIfError(workspaceResult.error)
+      throwIfError(membersResult.error)
+      throwIfError(projectsResult.error)
+      const memberRows = membersResult.data ?? []
+      const projectRows = projectsResult.data ?? []
+      const memberIds = memberRows.map((item) => item.user_id)
+      const projectIds = projectRows.map((item) => item.id)
+      const [profilesResult, projectMembersResult, appPartsResult, featuresResult] = await Promise.all([
+        memberIds.length ? supabase.from("profiles").select("*").in("id", memberIds) : Promise.resolve({ data: [], error: null }),
+        projectIds.length ? supabase.from("project_members").select("project_id, user_id").in("project_id", projectIds) : Promise.resolve({ data: [], error: null }),
+        projectIds.length ? supabase.from("app_parts").select("*").in("project_id", projectIds).order("created_at") : Promise.resolve({ data: [], error: null }),
+        projectIds.length ? supabase.from("features").select("*").in("project_id", projectIds).order("created_at") : Promise.resolve({ data: [], error: null }),
+      ])
+      throwIfError(profilesResult.error)
+      throwIfError(projectMembersResult.error)
+      throwIfError(appPartsResult.error)
+      throwIfError(featuresResult.error)
+      const profileRows = profilesResult.data ?? []
+      const projectMemberRows = projectMembersResult.data ?? []
+      const appPartRows = appPartsResult.data ?? []
+      const featureRows = featuresResult.data ?? []
+      const appPartIds = appPartRows.map((item) => item.id)
+      const featureIds = featureRows.map((item) => item.id)
+      const [activeUsersResult, commitsResult, featureMembersResult, requirementsResult, updatesResult] = await Promise.all([
+        appPartIds.length ? supabase.from("app_part_active_users").select("app_part_id, user_id").in("app_part_id", appPartIds) : Promise.resolve({ data: [], error: null }),
+        appPartIds.length ? supabase.from("app_part_commits").select("*").in("app_part_id", appPartIds).order("created_at", { ascending: false }) : Promise.resolve({ data: [], error: null }),
+        featureIds.length ? supabase.from("feature_members").select("feature_id, user_id, role").in("feature_id", featureIds) : Promise.resolve({ data: [], error: null }),
+        featureIds.length ? supabase.from("requirements").select("*").in("feature_id", featureIds).order("created_at") : Promise.resolve({ data: [], error: null }),
+        featureIds.length ? supabase.from("feature_updates").select("*").in("feature_id", featureIds).order("created_at", { ascending: false }) : Promise.resolve({ data: [], error: null }),
+      ])
+      ;[activeUsersResult, commitsResult, featureMembersResult, requirementsResult, updatesResult].forEach((result) => throwIfError(result.error))
+      const activeUserRows = activeUsersResult.data ?? []
+      const commitRows = commitsResult.data ?? []
+      const featureMemberRows = featureMembersResult.data ?? []
+      const requirementRows = requirementsResult.data ?? []
+      const updateRows = updatesResult.data ?? []
+      const roleByUser = new Map(memberRows.map((item) => [item.user_id, item.role]))
+      const users = profileRows.map((profile) => ({
+        id: profile.id,
+        name: profile.name,
+        handle: profile.handle,
+        email: profile.email,
+        initials: profile.initials,
+        color: profile.color,
+        role: roleByUser.get(profile.id) as UserRole,
+        jobTitle: profile.job_title,
+        lastActiveAt: profile.last_active_at,
+      }))
+      const projects: Project[] = projectRows.map((project) => ({
+        id: project.id,
+        name: project.name,
+        description: project.description,
+        type: project.type,
+        platforms: project.platforms,
+        status: project.status,
+        color: project.color,
+        icon: project.icon,
+        memberIds: projectMemberRows.filter((item) => item.project_id === project.id).map((item) => item.user_id),
+        visibility: project.visibility,
+        featurePrefix: project.feature_prefix,
+        repositoryName: project.repository_name,
+        autoArchiveDone: project.auto_archive_done,
+        createdAt: project.created_at,
+      }))
+      const appParts: AppPart[] = appPartRows.map((part) => ({
+        id: part.id,
+        projectId: part.project_id,
+        key: part.key,
+        name: part.name,
+        description: part.description,
+        platform: part.platform,
+        releaseState: part.release_state,
+        ownerUserId: part.owner_user_id ?? "",
+        activeUserIds: activeUserRows.filter((item) => item.app_part_id === part.id).map((item) => item.user_id),
+        commits: commitRows.filter((item) => item.app_part_id === part.id).map((item) => ({ id: item.id, hash: item.hash, message: item.message, branch: item.branch, authorId: item.author_id, createdAt: item.created_at, url: item.url })),
+        createdAt: part.created_at,
+      }))
+      const features: Feature[] = featureRows.map((feature) => ({
+        id: feature.id,
+        projectId: feature.project_id,
+        key: feature.key,
+        title: feature.title,
+        description: feature.description,
+        status: feature.status,
+        priority: feature.priority,
+        health: feature.health,
+        appPartId: feature.app_part_id ?? "",
+        startDate: feature.start_date ?? "",
+        targetDate: feature.target_date ?? "",
+        estimate: feature.estimate,
+        members: featureMemberRows.filter((item) => item.feature_id === feature.id).map((item) => ({ userId: item.user_id, role: item.role })),
+        requirements: requirementRows.filter((item) => item.feature_id === feature.id).map((item) => ({ id: item.id, title: item.title, completed: item.completed })),
+        updates: updateRows.filter((item) => item.feature_id === feature.id).map((item) => ({ id: item.id, authorId: item.author_id, message: item.message, health: item.health, createdAt: item.created_at })),
+        createdAt: feature.created_at,
+      }))
+      setWorkspaceId(activeWorkspaceId)
+      setData({
+        users,
+        projects,
+        appParts,
+        features,
+        currentUserId: user.id,
+        settings: {
+          name: workspaceResult.data.name,
+          slug: workspaceResult.data.slug,
+          visibility: workspaceResult.data.visibility,
+          allowMemberInvites: workspaceResult.data.allow_member_invites,
+          emailNotifications: workspaceResult.data.email_notifications,
+          weeklyDigest: workspaceResult.data.weekly_digest,
+          defaultProjectStatus: workspaceResult.data.default_project_status,
+        },
+      })
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Workspace konnte nicht geladen werden.")
+    } finally {
+      setLoading(false)
+    }
+  }, [user])
 
   useEffect(() => {
-    localWorkspaceRepository.save(data)
-  }, [data])
+    const timer = window.setTimeout(() => {
+      if (isAuthenticated) void reload()
+      else {
+        setData(emptyData)
+        setWorkspaceId("")
+        setLoading(false)
+      }
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [isAuthenticated, reload])
 
   const value = useMemo<WorkspaceContextValue>(() => ({
     ...data,
-    createProject(input) {
-      const project: Project = {
-        id: createId("project"),
-        name: input.name,
-        description: input.description,
-        type: input.type,
-        platforms: input.platforms,
-        status: "Aktiv",
-        color: input.color,
-        icon: input.name.trim().slice(0, 1).toUpperCase(),
-        memberIds: input.memberIds,
-        createdAt: new Date().toISOString(),
-      }
+    workspaceId,
+    loading,
+    error,
+    reload,
+    async createWorkspace(name) {
+      const { data: result, error: functionError } = await supabase.functions.invoke("workspace-onboarding", { body: { action: "create", name } })
+      if (functionError || result?.error) throw new Error(result?.error ?? functionError?.message ?? "Organisation konnte nicht erstellt werden.")
+      return { code: result.code, workspaceName: result.workspaceName }
+    },
+    async joinWorkspace(code) {
+      const { data: result, error: functionError } = await supabase.functions.invoke("workspace-onboarding", { body: { action: "join", code } })
+      if (functionError || result?.error) throw new Error(result?.error ?? functionError?.message ?? "Organisation konnte nicht gefunden werden.")
+      await reload()
+      return { workspaceName: result.workspaceName }
+    },
+    async rotateWorkspaceCode() {
+      const { data: result, error: functionError } = await supabase.functions.invoke("workspace-onboarding", { body: { action: "rotate", workspaceId } })
+      if (functionError || result?.error) throw new Error(result?.error ?? functionError?.message ?? "Zugangscode konnte nicht erstellt werden.")
+      return result.code
+    },
+    async createProject(input) {
+      if (!user || !workspaceId) throw new Error("Workspace ist nicht bereit.")
+      const id = crypto.randomUUID()
+      const prefix = input.name.replace(/[^A-Za-zÄÖÜäöüß]/g, "").slice(0, 3).toUpperCase() || "MOD"
+      const project: Project = { id, name: input.name, description: input.description, type: input.type, platforms: input.platforms, status: data.settings.defaultProjectStatus, color: input.color, icon: input.name.trim().slice(0, 1).toUpperCase(), memberIds: input.memberIds, visibility: "Workspace", featurePrefix: prefix, repositoryName: "", autoArchiveDone: false, createdAt: new Date().toISOString() }
+      const projectResult = await supabase.from("projects").insert({ id, workspace_id: workspaceId, name: project.name, description: project.description, type: project.type, platforms: project.platforms, status: project.status, color: project.color, icon: project.icon, visibility: project.visibility, feature_prefix: project.featurePrefix, repository_name: "", auto_archive_done: false, created_by: user.id })
+      throwIfError(projectResult.error)
+      const memberIds = Array.from(new Set([user.id, ...input.memberIds]))
+      const memberResult = await supabase.from("project_members").insert(memberIds.map((userId) => ({ project_id: id, user_id: userId })))
+      throwIfError(memberResult.error)
+      project.memberIds = memberIds
       setData((current) => ({ ...current, projects: [...current.projects, project] }))
       return project
     },
-    createFeature(input) {
+    async createFeature(input) {
+      if (!user) throw new Error("Du bist nicht angemeldet.")
       const project = data.projects.find((item) => item.id === input.projectId)
-      if (!project) throw new Error("Projekt wurde nicht gefunden")
-      const feature: Feature = {
-        id: createId("feature"),
-        projectId: input.projectId,
-        key: projectCode(project, data.features),
-        title: input.title,
-        description: input.description,
-        status: input.status,
-        priority: input.priority,
-        health: "Im Plan",
-        startDate: new Date().toISOString().slice(0, 10),
-        targetDate: input.targetDate,
-        estimate: "Noch offen",
-        members: input.memberIds.map((userId, index) => ({
-          userId,
-          role: index === 0 ? "Lead" : "Beteiligte",
-        })),
-        requirements: [],
-        updates: [],
-        createdAt: new Date().toISOString(),
-      }
+      if (!project) throw new Error("Projekt wurde nicht gefunden.")
+      const feature: Feature = { id: crypto.randomUUID(), projectId: input.projectId, key: projectCode(project, data.features), title: input.title, description: input.description, status: input.status, priority: input.priority, health: "Im Plan", appPartId: input.appPartId, startDate: new Date().toISOString().slice(0, 10), targetDate: input.targetDate, estimate: "Noch offen", members: input.memberIds.map((userId, index) => ({ userId, role: index === 0 ? "Lead" : "Beteiligte" })), requirements: [], updates: [], createdAt: new Date().toISOString() }
+      const featureResult = await supabase.from("features").insert({ id: feature.id, project_id: feature.projectId, app_part_id: feature.appPartId || null, key: feature.key, title: feature.title, description: feature.description, status: feature.status, priority: feature.priority, health: feature.health, start_date: feature.startDate, target_date: feature.targetDate || null, estimate: feature.estimate, created_by: user.id })
+      throwIfError(featureResult.error)
+      const membersResult = await supabase.from("feature_members").insert(feature.members.map((member) => ({ feature_id: feature.id, user_id: member.userId, role: member.role })))
+      throwIfError(membersResult.error)
       setData((current) => ({ ...current, features: [...current.features, feature] }))
       return feature
     },
-    updateFeature(featureId, updates) {
-      setData((current) => ({
-        ...current,
-        features: current.features.map((feature) => feature.id === featureId ? { ...feature, ...updates } : feature),
-      }))
+    async createAppPart(input) {
+      if (!user) throw new Error("Du bist nicht angemeldet.")
+      const project = data.projects.find((item) => item.id === input.projectId)
+      if (!project) throw new Error("Projekt wurde nicht gefunden.")
+      const part: AppPart = { id: crypto.randomUUID(), projectId: input.projectId, key: appPartCode(project, data.appParts), name: input.name, description: input.description, platform: input.platform, releaseState: input.releaseState, ownerUserId: input.ownerUserId, activeUserIds: input.ownerUserId ? [input.ownerUserId] : [], commits: [], createdAt: new Date().toISOString() }
+      const partResult = await supabase.from("app_parts").insert({ id: part.id, project_id: part.projectId, key: part.key, name: part.name, description: part.description, platform: part.platform, release_state: part.releaseState, owner_user_id: part.ownerUserId || null, created_by: user.id })
+      throwIfError(partResult.error)
+      if (part.ownerUserId) throwIfError((await supabase.from("app_part_active_users").insert({ app_part_id: part.id, user_id: part.ownerUserId })).error)
+      setData((current) => ({ ...current, appParts: [...current.appParts, part] }))
+      return part
     },
-    toggleRequirement(featureId, requirementId) {
-      setData((current) => ({
-        ...current,
-        features: current.features.map((feature) => feature.id === featureId
-          ? {
-              ...feature,
-              requirements: feature.requirements.map((requirement) => requirement.id === requirementId
-                ? { ...requirement, completed: !requirement.completed }
-                : requirement),
-            }
-          : feature),
-      }))
-    },
-    addRequirement(featureId, title) {
-      const requirement: Requirement = { id: createId("requirement"), title, completed: false }
-      setData((current) => ({
-        ...current,
-        features: current.features.map((feature) => feature.id === featureId
-          ? { ...feature, requirements: [...feature.requirements, requirement] }
-          : feature),
-      }))
-    },
-    addUpdate(featureId, message, health) {
-      const update: Update = {
-        id: createId("update"),
-        authorId: data.currentUserId,
-        message,
-        health,
-        createdAt: new Date().toISOString(),
+    async updateProject(projectId, updates) {
+      const payload = { name: updates.name, description: updates.description, type: updates.type, platforms: updates.platforms, status: updates.status, color: updates.color, icon: updates.icon, visibility: updates.visibility, feature_prefix: updates.featurePrefix, repository_name: updates.repositoryName, auto_archive_done: updates.autoArchiveDone }
+      const cleaned = Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== undefined))
+      throwIfError((await supabase.from("projects").update(cleaned).eq("id", projectId)).error)
+      if (updates.memberIds) {
+        const existingIds = data.projects.find((project) => project.id === projectId)?.memberIds ?? []
+        const memberIds = Array.from(new Set([...(user ? [user.id] : []), ...updates.memberIds]))
+        const addedIds = memberIds.filter((userId) => !existingIds.includes(userId))
+        const removedIds = existingIds.filter((userId) => !memberIds.includes(userId))
+        if (addedIds.length) throwIfError((await supabase.from("project_members").insert(addedIds.map((userId) => ({ project_id: projectId, user_id: userId })))).error)
+        if (removedIds.length) throwIfError((await supabase.from("project_members").delete().eq("project_id", projectId).in("user_id", removedIds)).error)
+        updates = { ...updates, memberIds }
       }
-      setData((current) => ({
-        ...current,
-        features: current.features.map((feature) => feature.id === featureId
-          ? { ...feature, health, updates: [update, ...feature.updates] }
-          : feature),
-      }))
+      setData((current) => ({ ...current, projects: current.projects.map((project) => project.id === projectId ? { ...project, ...updates } : project) }))
     },
-    setFeatureMembers(featureId, members) {
-      setData((current) => ({
-        ...current,
-        features: current.features.map((feature) => feature.id === featureId ? { ...feature, members } : feature),
-      }))
+    async updateWorkspaceSettings(updates) {
+      const payload = { name: updates.name, slug: updates.slug, visibility: updates.visibility, allow_member_invites: updates.allowMemberInvites, email_notifications: updates.emailNotifications, weekly_digest: updates.weeklyDigest, default_project_status: updates.defaultProjectStatus }
+      const cleaned = Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== undefined))
+      throwIfError((await supabase.from("workspaces").update(cleaned).eq("id", workspaceId)).error)
+      setData((current) => ({ ...current, settings: { ...current.settings, ...updates } }))
     },
-    setCurrentUser(userId) {
-      setData((current) => ({ ...current, currentUserId: userId }))
+    async updateFeature(featureId, updates) {
+      const payload = { app_part_id: updates.appPartId === "" ? null : updates.appPartId, title: updates.title, description: updates.description, status: updates.status, priority: updates.priority, health: updates.health, start_date: updates.startDate || undefined, target_date: updates.targetDate === "" ? null : updates.targetDate, estimate: updates.estimate }
+      const cleaned = Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== undefined))
+      throwIfError((await supabase.from("features").update(cleaned).eq("id", featureId)).error)
+      setData((current) => ({ ...current, features: current.features.map((feature) => feature.id === featureId ? { ...feature, ...updates } : feature) }))
     },
-    resetDemo() {
-      setData(localWorkspaceRepository.reset())
+    async toggleRequirement(featureId, requirementId) {
+      const feature = data.features.find((item) => item.id === featureId)
+      const requirement = feature?.requirements.find((item) => item.id === requirementId)
+      if (!requirement) return
+      throwIfError((await supabase.from("requirements").update({ completed: !requirement.completed }).eq("id", requirementId)).error)
+      setData((current) => ({ ...current, features: current.features.map((item) => item.id === featureId ? { ...item, requirements: item.requirements.map((entry) => entry.id === requirementId ? { ...entry, completed: !entry.completed } : entry) } : item) }))
     },
-  }), [data])
+    async addRequirement(featureId, title) {
+      if (!user) return
+      const requirement: Requirement = { id: crypto.randomUUID(), title, completed: false }
+      throwIfError((await supabase.from("requirements").insert({ id: requirement.id, feature_id: featureId, title, created_by: user.id })).error)
+      setData((current) => ({ ...current, features: current.features.map((feature) => feature.id === featureId ? { ...feature, requirements: [...feature.requirements, requirement] } : feature) }))
+    },
+    async addUpdate(featureId, message, health) {
+      if (!user) return
+      const update: Update = { id: crypto.randomUUID(), authorId: user.id, message, health, createdAt: new Date().toISOString() }
+      throwIfError((await supabase.from("feature_updates").insert({ id: update.id, feature_id: featureId, author_id: user.id, message, health })).error)
+      throwIfError((await supabase.from("features").update({ health }).eq("id", featureId)).error)
+      setData((current) => ({ ...current, features: current.features.map((feature) => feature.id === featureId ? { ...feature, health, updates: [update, ...feature.updates] } : feature) }))
+    },
+    async setFeatureMembers(featureId, members) {
+      throwIfError((await supabase.from("feature_members").delete().eq("feature_id", featureId)).error)
+      if (members.length) throwIfError((await supabase.from("feature_members").insert(members.map((member) => ({ feature_id: featureId, user_id: member.userId, role: member.role })))).error)
+      setData((current) => ({ ...current, features: current.features.map((feature) => feature.id === featureId ? { ...feature, members } : feature) }))
+    },
+    async updateAppPart(appPartId, updates) {
+      const payload = { name: updates.name, description: updates.description, platform: updates.platform, release_state: updates.releaseState, owner_user_id: updates.ownerUserId === "" ? null : updates.ownerUserId }
+      const cleaned = Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== undefined))
+      throwIfError((await supabase.from("app_parts").update(cleaned).eq("id", appPartId)).error)
+      setData((current) => ({ ...current, appParts: current.appParts.map((part) => part.id === appPartId ? { ...part, ...updates } : part) }))
+    },
+    async claimAppPart(appPartId) {
+      if (!user) return
+      throwIfError((await supabase.from("app_parts").update({ owner_user_id: user.id }).eq("id", appPartId)).error)
+      throwIfError((await supabase.from("app_part_active_users").upsert({ app_part_id: appPartId, user_id: user.id })).error)
+      setData((current) => ({ ...current, appParts: current.appParts.map((part) => part.id === appPartId ? { ...part, ownerUserId: user.id, activeUserIds: Array.from(new Set([...part.activeUserIds, user.id])) } : part) }))
+    },
+    async setActiveAppPartUsers(appPartId, userIds) {
+      throwIfError((await supabase.from("app_part_active_users").delete().eq("app_part_id", appPartId)).error)
+      if (userIds.length) throwIfError((await supabase.from("app_part_active_users").insert(userIds.map((userId) => ({ app_part_id: appPartId, user_id: userId })))).error)
+      setData((current) => ({ ...current, appParts: current.appParts.map((part) => part.id === appPartId ? { ...part, activeUserIds: userIds } : part) }))
+    },
+    async addAppPartCommit(appPartId, input) {
+      if (!user) return
+      const commit = { id: crypto.randomUUID(), ...input, authorId: user.id, createdAt: new Date().toISOString() }
+      throwIfError((await supabase.from("app_part_commits").insert({ id: commit.id, app_part_id: appPartId, hash: commit.hash, message: commit.message, branch: commit.branch, author_id: user.id, url: commit.url })).error)
+      setData((current) => ({ ...current, appParts: current.appParts.map((part) => part.id === appPartId ? { ...part, commits: [commit, ...part.commits] } : part) }))
+    },
+    async inviteUser(input) {
+      const { error: functionError } = await supabase.functions.invoke("invite-member", { body: { workspaceId, ...input } })
+      if (functionError) throw new Error(functionError.message)
+      await reload()
+    },
+    async updateUserRole(userId, role) {
+      throwIfError((await supabase.from("workspace_members").update({ role }).eq("workspace_id", workspaceId).eq("user_id", userId)).error)
+      setData((current) => ({ ...current, users: current.users.map((item) => item.id === userId ? { ...item, role } : item) }))
+    },
+    async updateUser(userId, updates) {
+      const payload = { name: updates.name, email: updates.email, job_title: updates.jobTitle }
+      const cleaned = Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== undefined))
+      if (userId === user?.id && updates.email && updates.email !== user.email) throwIfError((await supabase.auth.updateUser({ email: updates.email })).error)
+      delete cleaned.email
+      throwIfError((await supabase.from("profiles").update(cleaned).eq("id", userId)).error)
+      setData((current) => ({ ...current, users: current.users.map((item) => item.id === userId ? { ...item, ...updates } : item) }))
+    },
+  }), [data, error, loading, reload, user, workspaceId])
 
   return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>
 }
@@ -155,3 +409,5 @@ export function useWorkspace() {
 
 export const featureStatuses: FeatureStatus[] = ["Idee", "Geplant", "Bereit", "In Arbeit", "Im Review", "Blockiert", "Fertig"]
 export const priorities: Priority[] = ["Dringend", "Hoch", "Normal", "Niedrig", "Keine"]
+export const releaseStates = ["Frei", "In Entwicklung", "Instabil", "Stabil", "Production Ready"] as const
+export const projectStatuses: ProjectStatus[] = ["Geplant", "Aktiv", "Pausiert", "Abgeschlossen"]

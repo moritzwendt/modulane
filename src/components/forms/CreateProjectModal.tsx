@@ -30,13 +30,19 @@ export function CreateProjectModal({ open, onClose }: { open: boolean; onClose()
     }))
   }
 
-  const submit = (event: FormEvent) => {
+  const submit = async (event: FormEvent) => {
     event.preventDefault()
     if (!input.name.trim()) {
       setError("Bitte gib dem Projekt einen Namen.")
       return
     }
-    const project = createProject({ ...input, name: input.name.trim(), description: input.description.trim() })
+    let project
+    try {
+      project = await createProject({ ...input, name: input.name.trim(), description: input.description.trim() })
+    } catch {
+      setError("Das Projekt konnte nicht erstellt werden.")
+      return
+    }
     setInput({ name: "", description: "", type: "Mobile App", platforms: ["iOS", "Android"], memberIds: [currentUserId], color: colors[0] })
     setError("")
     onClose()

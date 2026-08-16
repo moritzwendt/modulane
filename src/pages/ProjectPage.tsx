@@ -1,7 +1,8 @@
-import { Funnel, GridFour, List, Plus, SortAscending } from "@phosphor-icons/react"
+import { Funnel, GearSix, GridFour, List, Plus, SortAscending } from "@phosphor-icons/react"
 import { useMemo, useState } from "react"
-import { useParams } from "react-router-dom"
+import { Link, useParams } from "react-router-dom"
 import { CreateFeatureModal } from "../components/forms/CreateFeatureModal"
+import { CreateAppPartModal } from "../components/forms/CreateAppPartModal"
 import { FeatureRow } from "../components/features/FeatureRow"
 import { AvatarGroup } from "../components/ui/Avatar"
 import { StatusBadge } from "../components/ui/StatusBadge"
@@ -10,9 +11,10 @@ import { featureStatuses, useWorkspace } from "../state/WorkspaceContext"
 
 export function ProjectPage() {
   const { projectId } = useParams()
-  const { projects, features, users } = useWorkspace()
+  const { projects, features, appParts, users } = useWorkspace()
   const project = projects.find((item) => item.id === projectId)
   const [createOpen, setCreateOpen] = useState(false)
+  const [createAppPartOpen, setCreateAppPartOpen] = useState(false)
   const [statusFilter, setStatusFilter] = useState<FeatureStatus | "Alle">("Alle")
   const [query, setQuery] = useState("")
   const [view, setView] = useState<"list" | "board">("list")
@@ -39,12 +41,15 @@ export function ProjectPage() {
         <div className="project-hero-actions">
           <AvatarGroup users={projectUsers} />
           <StatusBadge value={project.status} />
+          <Link className="button secondary" to={`/projects/${project.id}/settings`}><GearSix size={16} />Einstellungen</Link>
+          <button className="button secondary" type="button" onClick={() => setCreateAppPartOpen(true)}><Plus size={16} />App Teil</button>
           <button className="button primary" type="button" onClick={() => setCreateOpen(true)}><Plus size={16} weight="bold" />Feature erstellen</button>
         </div>
       </div>
       <p className="project-description">{project.description}</p>
       <div className="project-meta-strip">
         <span><strong>{features.filter((feature) => feature.projectId === project.id).length}</strong> Features</span>
+        <Link to="/product"><strong>{appParts.filter((appPart) => appPart.projectId === project.id).length}</strong> App Teile</Link>
         <span><strong>{projectUsers.length}</strong> Mitglieder</span>
         <span><strong>{project.platforms.join(", ")}</strong> Plattformen</span>
       </div>
@@ -87,6 +92,7 @@ export function ProjectPage() {
       )}
 
       <CreateFeatureModal open={createOpen} onClose={() => setCreateOpen(false)} project={project} />
+      <CreateAppPartModal open={createAppPartOpen} onClose={() => setCreateAppPartOpen(false)} initialProjectId={project.id} />
     </div>
   )
 }
