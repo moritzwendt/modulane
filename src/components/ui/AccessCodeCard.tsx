@@ -1,6 +1,7 @@
 import { Check, Copy, HourglassMedium } from "@phosphor-icons/react"
 import { useEffect, useMemo, useState } from "react"
 import type { JoinCodeRole } from "../../domain/types"
+import { roleLabels } from "../../domain/permissions"
 
 interface AccessCodeCardProps {
   code: string
@@ -34,7 +35,7 @@ export function AccessCodeCard({ code, role, expiresAt }: AccessCodeCardProps) {
   }
 
   return <div className={`access-code-card${expired ? " expired" : ""}`}>
-    <div className="access-code-card-head"><span>Aktiver Zugangscode</span><span className="access-code-role-badge">{role}</span></div>
+    <div className="access-code-card-head"><span>Aktiver Zugangscode</span><span className="access-code-role-badge">{roleLabels[role]}</span></div>
     <div className="access-code-value"><strong>{code}</strong><button type="button" onClick={copy} disabled={expired} aria-label="Zugangscode kopieren">{copied ? <Check size={17} /> : <Copy size={17} />}{copied ? "Kopiert" : "Kopieren"}</button></div>
     <div className="access-code-lifetime"><div><HourglassMedium size={16} /><span>{remainingLabel(remainingSeconds)}</span></div><small>Gültig bis {new Intl.DateTimeFormat("de-DE", { hour: "2-digit", minute: "2-digit" }).format(new Date(expiresAt))} Uhr</small></div>
     <div className="access-code-progress" aria-hidden="true"><span style={{ width: `${progress}%` }} /></div>

@@ -20,14 +20,15 @@ import { useEffect, useRef, useState, type ReactNode } from "react"
 import { Link, NavLink, useNavigate } from "react-router-dom"
 import { useAuth } from "../../state/AuthContext"
 import { useWorkspace } from "../../state/WorkspaceContext"
+import { organizationPermissions, roleLabels } from "../../domain/permissions"
 import { Avatar } from "../ui/Avatar"
 import { IdentityImage } from "../ui/IdentityImage"
 import { Modal } from "../ui/Modal"
 
 const navigation = [
   { to: "/dashboard", label: "Übersicht", icon: House },
-  { to: "/product", label: "Das Produkt", icon: Cube },
-  { to: "/my-features", label: "Meine Features", icon: ListChecks },
+  { to: "/components", label: "Komponenten", icon: Cube },
+  { to: "/my-tasks", label: "Meine Aufgaben", icon: ListChecks },
   { to: "/projects", label: "Projekte", icon: FolderSimple },
   { to: "/team", label: "Team", icon: Users },
   { to: "/settings", label: "Einstellungen", icon: GearSix },
@@ -38,6 +39,7 @@ export function AppShell({ children, onCreateProject }: { children: ReactNode; o
   const { logout } = useAuth()
   const navigate = useNavigate()
   const currentUser = users.find((user) => user.id === currentUserId) ?? users[0]
+  const permissions = currentUser ? organizationPermissions(currentUser.role, settings) : null
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
@@ -104,7 +106,7 @@ export function AppShell({ children, onCreateProject }: { children: ReactNode; o
         </div>
 
         <nav className="primary-nav" aria-label="Hauptnavigation">
-          {navigation.map(({ to, label, icon: Icon }) => (
+          {navigation.filter(({ to }) => to !== "/team" || permissions?.canViewTeam).map(({ to, label, icon: Icon }) => (
             <NavLink key={to} to={to} end={to === "/dashboard"} onClick={() => setSidebarOpen(false)} className={({ isActive }) => isActive ? "nav-item active" : "nav-item"}>
               <Icon size={17} weight="regular" />
               <span>{label}</span>
@@ -114,9 +116,9 @@ export function AppShell({ children, onCreateProject }: { children: ReactNode; o
 
         <div className="sidebar-section-heading">
           <span>Projekte</span>
-          <button type="button" onClick={onCreateProject} aria-label="Projekt erstellen">
+          {permissions?.canCreateProjects && <button type="button" onClick={onCreateProject} aria-label="Projekt erstellen">
             <Plus size={15} />
-          </button>
+          </button>}
         </div>
         <nav className="project-nav" aria-label="Projekte">
           {projects.map((project) => (
@@ -132,7 +134,7 @@ export function AppShell({ children, onCreateProject }: { children: ReactNode; o
             <Avatar user={currentUser} size="small" />
             <span>
               <strong>{currentUser.name}</strong>
-              <small>{currentUser.role}</small>
+              <small>{roleLabels[currentUser.role]}</small>
             </span>
           </div>
         </div>}
@@ -158,11 +160,11 @@ export function AppShell({ children, onCreateProject }: { children: ReactNode; o
             {currentUser && <div className="account-menu-area" ref={accountMenuRef}>
               <button className="account-menu-trigger" type="button" aria-label="Benutzermenü öffnen" aria-expanded={accountMenuOpen} aria-haspopup="menu" onClick={() => { setAccountMenuOpen((value) => !value); setNotificationsOpen(false) }}><Avatar user={currentUser} size="small" /><CaretDown size={12} /></button>
               {accountMenuOpen && <div className="account-menu" role="menu">
-                <div className="account-menu-identity"><Avatar user={currentUser} size="large" /><div><strong>{currentUser.name}</strong><span>{currentUser.email}</span><small>{currentUser.role} in {settings.name}</small></div></div>
+                <div className="account-menu-identity"><Avatar user={currentUser} size="large" /><div><strong>{currentUser.name}</strong><span>{currentUser.email}</span><small>{roleLabels[currentUser.role]} in {settings.name}</small></div></div>
                 <nav aria-label="Benutzereinstellungen">
                   <Link to="/settings?tab=account" role="menuitem" onClick={() => setAccountMenuOpen(false)}><UserCircle size={17} /><span><strong>Mein Konto</strong><small>Profil und E Mail Adresse</small></span></Link>
                   <Link to="/settings?tab=notifications" role="menuitem" onClick={() => setAccountMenuOpen(false)}><Bell size={17} /><span><strong>Benachrichtigungen</strong><small>Persönliche Hinweise</small></span></Link>
-                  <Link to="/settings?tab=workspace" role="menuitem" onClick={() => setAccountMenuOpen(false)}><GearSix size={17} /><span><strong>Organisationseinstellungen</strong><small>Profil und Zugänge</small></span></Link>
+                  {permissions?.canManageOrganization && <Link to="/settings?tab=workspace" role="menuitem" onClick={() => setAccountMenuOpen(false)}><GearSix size={17} /><span><strong>Organisationseinstellungen</strong><small>Profil und Zugänge</small></span></Link>}
                 </nav>
                 <div className="account-menu-actions">
                   <button type="button" role="menuitem" onClick={() => setTheme(theme === "light" ? "dark" : "light")}>{theme === "light" ? <Moon size={17} /> : <Sun size={17} />}<span>{theme === "light" ? "Dunkles Design" : "Helles Design"}</span></button>
@@ -174,7 +176,7 @@ export function AppShell({ children, onCreateProject }: { children: ReactNode; o
               <div className="notification-popover">
                 <div><strong>Benachrichtigungen</strong><button type="button" onClick={() => setNotificationsOpen(false)} aria-label="Benachrichtigungen schließen"><X size={15} /></button></div>
                 {recentNotifications.map(({ feature, update }) => (
-                  <Link key={update.id} to={`/projects/${feature.projectId}/features/${feature.id}`} onClick={() => setNotificationsOpen(false)}>
+                  <Link key={update.id} to={`/projects/${feature.projectId}/tasks/${feature.id}`} onClick={() => setNotificationsOpen(false)}>
                     <strong>{feature.title}</strong>
                     <span>{update.message}</span>
                   </Link>
@@ -186,13 +188,13 @@ export function AppShell({ children, onCreateProject }: { children: ReactNode; o
         </header>
         <main id="main-content" className="main-content">{children}</main>
       </div>
-      <Modal open={searchOpen} onClose={() => { setSearchOpen(false); setSearchQuery("") }} title="Suchen" description="Finde Projekte, Features und App Teile in der gesamten Organisation.">
+      <Modal open={searchOpen} onClose={() => { setSearchOpen(false); setSearchQuery("") }} title="Suchen" description="Finde Projekte, Aufgaben und Komponenten in der gesamten Organisation.">
         <div className="global-search">
-          <div className="global-search-input"><MagnifyingGlass size={17} /><label className="visually-hidden" htmlFor="global-search-input">Suchbegriff</label><input id="global-search-input" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Projekt, Feature oder App Teil suchen" autoFocus /></div>
+          <div className="global-search-input"><MagnifyingGlass size={17} /><label className="visually-hidden" htmlFor="global-search-input">Suchbegriff</label><input id="global-search-input" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Projekt, Aufgabe oder Komponente suchen" autoFocus /></div>
           <div className="search-results">
             {projectResults.length > 0 && <div className="search-group"><span>Projekte</span>{projectResults.slice(0, 4).map((project) => <Link key={project.id} to={`/projects/${project.id}`} onClick={() => { setSearchOpen(false); setSearchQuery("") }}><span className="project-glyph" style={{ background: project.color }}>{project.icon}</span><strong>{project.name}</strong><small>{project.type}</small></Link>)}</div>}
-            {appPartResults.length > 0 && <div className="search-group"><span>App Teile</span>{appPartResults.slice(0, 7).map((appPart) => <Link key={appPart.id} to={`/product/app-parts/${appPart.id}`} onClick={() => { setSearchOpen(false); setSearchQuery("") }}><span className="feature-key">{appPart.key}</span><strong>{appPart.name}</strong><small>{appPart.releaseState}</small></Link>)}</div>}
-            {featureResults.length > 0 && <div className="search-group"><span>Features</span>{featureResults.slice(0, 7).map((feature) => <Link key={feature.id} to={`/projects/${feature.projectId}/features/${feature.id}`} onClick={() => { setSearchOpen(false); setSearchQuery("") }}><span className="feature-key">{feature.key}</span><strong>{feature.title}</strong><small>{feature.status}</small></Link>)}</div>}
+            {appPartResults.length > 0 && <div className="search-group"><span>Komponenten</span>{appPartResults.slice(0, 7).map((appPart) => <Link key={appPart.id} to={`/components/${appPart.id}`} onClick={() => { setSearchOpen(false); setSearchQuery("") }}><span className="feature-key">{appPart.key}</span><strong>{appPart.name}</strong><small>{appPart.releaseState}</small></Link>)}</div>}
+            {featureResults.length > 0 && <div className="search-group"><span>Aufgaben</span>{featureResults.slice(0, 7).map((feature) => <Link key={feature.id} to={`/projects/${feature.projectId}/tasks/${feature.id}`} onClick={() => { setSearchOpen(false); setSearchQuery("") }}><span className="feature-key">{feature.key}</span><strong>{feature.title}</strong><small>{feature.status}</small></Link>)}</div>}
             {!projectResults.length && !featureResults.length && !appPartResults.length && <div className="empty-state"><MagnifyingGlass size={24} /><strong>Keine Ergebnisse</strong><span>Versuche einen anderen Suchbegriff.</span></div>}
           </div>
         </div>

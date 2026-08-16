@@ -12,7 +12,7 @@ export function AuthLayout({ title, description, children }: { title: string; de
         <div className="auth-story-copy">
           <span className="auth-eyebrow">Arbeitszustand auf einen Blick</span>
           <h1>Jeder Appteil hat einen klaren Besitzer und einen echten Zustand.</h1>
-          <p>Plane Produktbereiche, sieh aktive Arbeit und halte technische Reife dort fest, wo dein Team sie braucht.</p>
+          <p>Plane Komponenten, sieh aktive Aufgaben und halte technische Reife dort fest, wo dein Team sie braucht.</p>
         </div>
         <div className="auth-product-preview">
           <div className="preview-top"><span>NOV 14</span><strong>Anmeldung und Registrierung</strong><span className="release-dot unstable" />In Entwicklung</div>

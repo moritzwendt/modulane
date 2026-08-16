@@ -24,8 +24,8 @@ export type FeatureStatus =
 export type Priority = "Dringend" | "Hoch" | "Normal" | "Niedrig" | "Keine"
 export type Health = "Im Plan" | "Gefährdet" | "Blockiert"
 export type FeatureRole = "Lead" | "Beteiligte" | "Review"
-export type UserRole = "Eigentümer" | "Administrator" | "Mitglied" | "Gast"
-export type JoinCodeRole = Exclude<UserRole, "Eigentümer">
+export type UserRole = "owner" | "admin" | "member" | "guest"
+export type JoinCodeRole = Exclude<UserRole, "owner">
 export type ReleaseState = "Frei" | "In Entwicklung" | "Instabil" | "Stabil" | "Production Ready"
 export type WorkspaceVisibility = "Nur auf Einladung" | "Offen für die Organisation"
 export type ProjectVisibility = "Workspace" | "Privat"
@@ -89,7 +89,7 @@ export interface Feature {
   status: FeatureStatus
   priority: Priority
   health: Health
-  appPartId: string
+  appPartIds: string[]
   startDate: string
   targetDate: string
   estimate: string
@@ -167,7 +167,7 @@ export interface FeatureInput {
   priority: Priority
   targetDate: string
   memberIds: string[]
-  appPartId: string
+  appPartIds: string[]
 }
 
 export interface AppPartInput {
@@ -183,7 +183,7 @@ export interface UserInput {
   firstName: string
   lastName: string
   email: string
-  role: UserRole
+  role: JoinCodeRole
   jobTitle: string
 }
 

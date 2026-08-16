@@ -50,7 +50,7 @@ export function CreateProjectModal({ open, onClose }: { open: boolean; onClose()
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Projekt erstellen" description="Lege eine App oder ein größeres Softwareprodukt an.">
+    <Modal open={open} onClose={onClose} title="Projekt erstellen" description="Lege eine App, einen Dienst oder ein größeres Softwareprojekt an.">
       <form className="form-stack" onSubmit={submit}>
         <div className="field-group">
           <label htmlFor="project-name">Name</label>

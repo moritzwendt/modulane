@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Navigate, Route, Routes } from "react-router-dom"
+import { Navigate, Route, Routes, useParams } from "react-router-dom"
 import { CreateProjectModal } from "./components/forms/CreateProjectModal"
 import { AppShell } from "./components/layout/AppShell"
 import { WorkspaceLoader } from "./components/ui/WorkspaceLoader"
@@ -52,10 +52,14 @@ function WorkspaceApp() {
         <Route path="/projects" element={<ProjectsPage onCreateProject={() => setCreateProjectOpen(true)} />} />
         <Route path="/projects/:projectId" element={<ProjectPage />} />
         <Route path="/projects/:projectId/settings" element={<ProjectSettingsPage />} />
-        <Route path="/projects/:projectId/features/:featureId" element={<FeaturePage />} />
-        <Route path="/product" element={<ProductPage />} />
-        <Route path="/product/app-parts/:appPartId" element={<AppPartPage />} />
-        <Route path="/my-features" element={<MyFeaturesPage />} />
+        <Route path="/projects/:projectId/tasks/:featureId" element={<FeaturePage />} />
+        <Route path="/components" element={<ProductPage />} />
+        <Route path="/components/:appPartId" element={<AppPartPage />} />
+        <Route path="/my-tasks" element={<MyFeaturesPage />} />
+        <Route path="/projects/:projectId/features/:featureId" element={<LegacyTaskRedirect />} />
+        <Route path="/product" element={<Navigate to="/components" replace />} />
+        <Route path="/product/app-parts/:appPartId" element={<LegacyComponentRedirect />} />
+        <Route path="/my-features" element={<Navigate to="/my-tasks" replace />} />
         <Route path="/team" element={<TeamPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
@@ -63,4 +67,14 @@ function WorkspaceApp() {
       <CreateProjectModal open={createProjectOpen} onClose={() => setCreateProjectOpen(false)} />
     </AppShell>
   )
+}
+
+function LegacyTaskRedirect() {
+  const { projectId, featureId } = useParams()
+  return <Navigate to={`/projects/${projectId}/tasks/${featureId}`} replace />
+}
+
+function LegacyComponentRedirect() {
+  const { appPartId } = useParams()
+  return <Navigate to={`/components/${appPartId}`} replace />
 }

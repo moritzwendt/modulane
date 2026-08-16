@@ -3,15 +3,18 @@ import { Link } from "react-router-dom"
 import { AvatarGroup } from "../components/ui/Avatar"
 import { StatusBadge } from "../components/ui/StatusBadge"
 import { useWorkspace } from "../state/WorkspaceContext"
+import { organizationPermissions } from "../domain/permissions"
 
 export function ProjectsPage({ onCreateProject }: { onCreateProject(): void }) {
-  const { projects, features, users } = useWorkspace()
+  const { projects, features, users, currentUserId, settings } = useWorkspace()
+  const currentUser = users.find((user) => user.id === currentUserId) ?? users[0]
+  const permissions = organizationPermissions(currentUser.role, settings)
 
   return (
     <div className="page">
       <div className="page-header">
-        <div><h1>Projekte</h1><p>Apps, Dienste und große Softwareprodukte an einem Ort.</p></div>
-        <button className="button primary" type="button" onClick={onCreateProject}><Plus size={16} weight="bold" />Projekt erstellen</button>
+        <div><h1>Projekte</h1><p>Apps, Dienste und große Softwareprojekte an einem Ort.</p></div>
+        {permissions.canCreateProjects && <button className="button primary" type="button" onClick={onCreateProject}><Plus size={16} weight="bold" />Projekt erstellen</button>}
       </div>
       <div className="project-grid">
         {projects.map((project) => {
@@ -33,7 +36,7 @@ export function ProjectsPage({ onCreateProject }: { onCreateProject(): void }) {
                 {project.platforms.map((platform) => <span key={platform}>{platform}</span>)}
               </div>
               <div className="project-card-footer">
-                <div><strong>{projectFeatures.length}</strong><span>Features</span></div>
+                <div><strong>{projectFeatures.length}</strong><span>Aufgaben</span></div>
                 <div><strong>{completed}</strong><span>Fertig</span></div>
                 <AvatarGroup users={projectUsers} />
                 <ArrowRight size={16} />

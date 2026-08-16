@@ -20,7 +20,7 @@ export function OnboardingPage() {
   const [accessCode, setAccessCode] = useState("")
   const [createdCode, setCreatedCode] = useState("")
   const [createdName, setCreatedName] = useState("")
-  const [codeRole, setCodeRole] = useState<JoinCodeRole>("Mitglied")
+  const [codeRole, setCodeRole] = useState<JoinCodeRole>("member")
   const [codeExpiresAt, setCodeExpiresAt] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState("")

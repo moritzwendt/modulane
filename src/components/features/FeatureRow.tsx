@@ -10,10 +10,10 @@ import { StatusBadge } from "../ui/StatusBadge"
 export function FeatureRow({ feature, users }: { feature: Feature; users: User[] }) {
   const { appParts } = useWorkspace()
   const members = users.filter((user) => feature.members.some((member) => member.userId === user.id))
-  const appPart = appParts.find((item) => item.id === feature.appPartId)
+  const linkedAppParts = appParts.filter((item) => feature.appPartIds.includes(item.id))
 
   return (
-    <Link className="feature-row" to={`/projects/${feature.projectId}/features/${feature.id}`}>
+    <Link className="feature-row" to={`/projects/${feature.projectId}/tasks/${feature.id}`}>
       <div className="feature-row-main">
         <span className="feature-key">{feature.key}</span>
         <div>
@@ -23,7 +23,7 @@ export function FeatureRow({ feature, users }: { feature: Feature; users: User[]
       </div>
       <div className="feature-row-meta">
         {feature.health !== "Im Plan" && <span className="health-icon" title={feature.health}><Warning size={16} weight="fill" /></span>}
-        {appPart && <span className="linked-app-part">{appPart.name}</span>}
+        {linkedAppParts.length > 0 && <span className="linked-app-part">{linkedAppParts[0].name}{linkedAppParts.length > 1 ? ` +${linkedAppParts.length - 1}` : ""}</span>}
         <span className="work-status"><StatusBadge value={feature.status} /></span>
         <span className="priority-status"><StatusBadge value={feature.priority} /></span>
         <span className="date-meta"><CalendarBlank size={15} />{formatDate(feature.targetDate)}</span>

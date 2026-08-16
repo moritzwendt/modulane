@@ -28,13 +28,14 @@ Deno.serve(async (request: Request) => {
     const lastName = String(body.lastName ?? "").trim()
     const name = `${firstName} ${lastName}`.trim()
     const jobTitle = String(body.jobTitle ?? "").trim()
-    const role = ["Administrator", "Mitglied", "Gast"].includes(body.role) ? body.role : "Mitglied"
+    const role = ["admin", "member", "guest"].includes(body.role) ? body.role : "member"
 
     if (!workspaceId || !email.includes("@") || !firstName || !lastName) return new Response(JSON.stringify({ error: "Vorname, Nachname, E Mail Adresse und Organisation sind erforderlich." }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } })
 
     const { data: membership } = await adminClient.from("workspace_members").select("role").eq("workspace_id", workspaceId).eq("user_id", authData.user.id).maybeSingle()
     const { data: workspace } = await adminClient.from("workspaces").select("allow_member_invites").eq("id", workspaceId).single()
-    const canInvite = membership?.role === "Eigentümer" || membership?.role === "Administrator" || (membership?.role === "Mitglied" && workspace?.allow_member_invites)
+    const allowedRoles = membership?.role === "owner" ? ["admin", "member", "guest"] : membership?.role === "admin" || membership?.role === "member" && workspace?.allow_member_invites ? ["member", "guest"] : []
+    const canInvite = allowedRoles.includes(role)
     if (!canInvite) return new Response(JSON.stringify({ error: "Du darfst für diese Organisation keine Personen einladen." }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } })
 
     const { error: invitationError } = await adminClient.from("workspace_invitations").upsert({

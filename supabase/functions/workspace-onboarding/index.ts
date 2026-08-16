@@ -12,7 +12,7 @@ const respond = (body: Record<string, unknown>, status = 200) => new Response(JS
 })
 
 const normalizeCode = (value: string) => value.toUpperCase().replace(/[^A-Z0-9]/g, "")
-const joinCodeRoles = ["Administrator", "Mitglied", "Gast"] as const
+const joinCodeRoles = ["admin", "member", "guest"] as const
 type JoinCodeRole = typeof joinCodeRoles[number]
 
 const readJoinCodeRole = (value: unknown): JoinCodeRole | null => joinCodeRoles.includes(value as JoinCodeRole) ? value as JoinCodeRole : null
@@ -70,7 +70,7 @@ Deno.serve(async (request: Request) => {
       const { error: memberError } = await adminClient.from("workspace_members").insert({
         workspace_id: workspaceId,
         user_id: userId,
-        role: "Eigentümer",
+        role: "owner",
       })
       if (memberError) {
         await adminClient.from("workspaces").delete().eq("id", workspaceId)
@@ -117,7 +117,8 @@ Deno.serve(async (request: Request) => {
       const role = readJoinCodeRole(body.role)
       if (!role) return respond({ error: "Bitte wähle eine gültige Rolle für den Zugangscode." }, 400)
       const { data: membership } = await adminClient.from("workspace_members").select("role").eq("workspace_id", workspaceId).eq("user_id", userId).maybeSingle()
-      if (!membership || !["Eigentümer", "Administrator"].includes(membership.role)) return respond({ error: "Du darfst den Zugangscode nicht ändern." }, 403)
+      const allowedRoles = membership?.role === "owner" ? ["admin", "member", "guest"] : membership?.role === "admin" ? ["member", "guest"] : []
+      if (!allowedRoles.includes(role)) return respond({ error: "Du darfst keinen Zugangscode mit dieser Rolle erstellen." }, 403)
 
       const code = generateCode()
       const codeHash = await hashCode(code)

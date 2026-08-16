@@ -5,6 +5,7 @@ import { AccessCodeCard } from "../components/ui/AccessCodeCard"
 import { AccessCodeRolePicker } from "../components/ui/AccessCodeRolePicker"
 import { Avatar } from "../components/ui/Avatar"
 import { IdentityImage } from "../components/ui/IdentityImage"
+import { invitableRoles, organizationPermissions } from "../domain/permissions"
 import type { JoinCodeRole, ProjectStatus, WorkspaceVisibility } from "../domain/types"
 import { useAuth } from "../state/AuthContext"
 import { projectStatuses, useWorkspace } from "../state/WorkspaceContext"
@@ -19,12 +20,14 @@ export function SettingsPage() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const currentUser = users.find((user) => user.id === currentUserId) ?? users[0]
+  const permissions = organizationPermissions(currentUser.role, settings)
+  const accessCodeRoles = invitableRoles(currentUser.role)
   const requestedTab = searchParams.get("tab")
-  const tab: SettingsTab = requestedTab === "account" ? "Konto" : requestedTab === "notifications" ? "Benachrichtigungen" : "Workspace"
+  const tab: SettingsTab = requestedTab === "account" ? "Konto" : requestedTab === "notifications" ? "Benachrichtigungen" : permissions.canManageOrganization ? "Workspace" : "Konto"
   const [workspaceInput, setWorkspaceInput] = useState(settings)
   const [accountInput, setAccountInput] = useState({ firstName: currentUser.firstName, lastName: currentUser.lastName, email: currentUser.email, jobTitle: currentUser.jobTitle })
   const [accessCode, setAccessCode] = useState("")
-  const [accessCodeRole, setAccessCodeRole] = useState<JoinCodeRole>("Mitglied")
+  const [accessCodeRole, setAccessCodeRole] = useState<JoinCodeRole>("member")
   const [accessCodeExpiresAt, setAccessCodeExpiresAt] = useState("")
   const [rotatingCode, setRotatingCode] = useState(false)
   const [notificationSaveState, setNotificationSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle")
@@ -114,7 +117,7 @@ export function SettingsPage() {
   }
 
   const tabs = [
-    { id: "Workspace" as const, label: "Organisation", icon: Buildings },
+    ...(permissions.canManageOrganization ? [{ id: "Workspace" as const, label: "Organisation", icon: Buildings }] : []),
     { id: "Konto" as const, label: "Mein Konto", icon: UserCircle },
     { id: "Benachrichtigungen" as const, label: "Benachrichtigungen", icon: Bell },
   ]
@@ -134,18 +137,18 @@ export function SettingsPage() {
           {tab === "Workspace" && (
             <form onSubmit={saveWorkspace}>
               <SettingsSection title="Organisationsprofil" description="Diese Angaben sehen alle Personen in deiner Organisation.">
-                <div className="identity-upload-row"><span className="organization-image"><IdentityImage name={workspaceInput.name} imageUrl={workspaceInput.logoUrl} color="#5f5f68" /></span><div><strong>Organisationslogo</strong><small>PNG, JPG oder WebP. Das Bild wird quadratisch zugeschnitten.</small>{["Eigentümer", "Administrator"].includes(currentUser.role) && <label className="button secondary upload-control"><UploadSimple size={15} />{uploadingLogo ? "Logo wird verarbeitet" : "Logo auswählen"}<input type="file" accept="image/png,image/jpeg,image/webp" disabled={uploadingLogo} onChange={(event) => void uploadLogo(event.target.files?.[0])} /></label>}</div></div>
+                <div className="identity-upload-row"><span className="organization-image"><IdentityImage name={workspaceInput.name} imageUrl={workspaceInput.logoUrl} color="#5f5f68" /></span><div><strong>Organisationslogo</strong><small>PNG, JPG oder WebP. Das Bild wird quadratisch zugeschnitten.</small>{permissions.canManageOrganization && <label className="button secondary upload-control"><UploadSimple size={15} />{uploadingLogo ? "Logo wird verarbeitet" : "Logo auswählen"}<input type="file" accept="image/png,image/jpeg,image/webp" disabled={uploadingLogo} onChange={(event) => void uploadLogo(event.target.files?.[0])} /></label>}</div></div>
                 <div className="form-grid"><div className="field-group"><label htmlFor="workspace-name">Name</label><input id="workspace-name" value={workspaceInput.name} onChange={(event) => setWorkspaceInput({ ...workspaceInput, name: event.target.value })} /></div><div className="field-group"><label htmlFor="workspace-slug">Kurzname</label><input id="workspace-slug" value={workspaceInput.slug} onChange={(event) => setWorkspaceInput({ ...workspaceInput, slug: event.target.value.toLocaleLowerCase().replace(/\s+/g, "_") })} /></div></div>
-                <div className="field-group"><label htmlFor="workspace-visibility">Zugriff</label><select id="workspace-visibility" value={workspaceInput.visibility} onChange={(event) => setWorkspaceInput({ ...workspaceInput, visibility: event.target.value as WorkspaceVisibility })}><option>Nur auf Einladung</option><option>Offen für die Organisation</option></select></div>
+                <div className="field-group"><label htmlFor="workspace-visibility">Zugriff</label><select id="workspace-visibility" value={workspaceInput.visibility} disabled={!permissions.canManageSecurity} onChange={(event) => setWorkspaceInput({ ...workspaceInput, visibility: event.target.value as WorkspaceVisibility })}><option>Nur auf Einladung</option><option>Offen für die Organisation</option></select>{!permissions.canManageSecurity && <p className="field-helper">Nur Eigentümer können den Organisationszugriff ändern.</p>}</div>
               </SettingsSection>
               <SettingsSection title="Standardwerte" description="Neue Projekte starten mit diesen Einstellungen.">
                 <div className="field-group"><label htmlFor="default-project-status">Standardstatus für Projekte</label><select id="default-project-status" value={workspaceInput.defaultProjectStatus} onChange={(event) => setWorkspaceInput({ ...workspaceInput, defaultProjectStatus: event.target.value as ProjectStatus })}>{projectStatuses.map((status) => <option key={status}>{status}</option>)}</select></div>
-                <ToggleRow checked={workspaceInput.allowMemberInvites} onChange={(checked) => setWorkspaceInput({ ...workspaceInput, allowMemberInvites: checked })} title="Einladungen durch Mitglieder" description="Mitglieder dürfen weitere Personen in die Organisation einladen." />
+                <ToggleRow checked={workspaceInput.allowMemberInvites} disabled={!permissions.canManageSecurity} onChange={(checked) => setWorkspaceInput({ ...workspaceInput, allowMemberInvites: checked })} title="Einladungen durch Mitglieder" description="Mitglieder dürfen weitere Personen als Mitglied oder Gast einladen." />
               </SettingsSection>
-              {["Eigentümer", "Administrator"].includes(currentUser.role) && <SettingsSection title="Einladung per Zugangscode" description="Erstelle einen zeitlich begrenzten Zugang für neue Personen.">
+              {permissions.canCreateAccessCodes && <SettingsSection title="Einladung per Zugangscode" description="Erstelle einen zeitlich begrenzten Zugang für neue Personen.">
                 <div className="access-code-settings">
                   <div className="access-code-preview">{accessCode ? <AccessCodeCard code={accessCode} role={accessCodeRole} expiresAt={accessCodeExpiresAt} /> : <div className="access-code-empty"><span><Key size={21} /></span><strong>Noch kein neuer Code</strong><p>Nach der Erstellung erscheint der Code einmalig an dieser Stelle.</p><small>Der lesbare Code wird nicht in der Datenbank gespeichert.</small></div>}</div>
-                  <div className="access-code-config"><div className="access-code-config-heading"><span>Rolle beim Beitritt</span><p>Lege fest, welche Rechte eine Person mit diesem Code erhält.</p></div><AccessCodeRolePicker value={accessCodeRole} onChange={setAccessCodeRole} /><div className="access-code-actions"><div className="access-code-duration"><HourglassMedium size={17} /><span><strong>Eine Stunde gültig</strong><small>Ein neuer Code beendet den vorherigen sofort.</small></span></div><button className="button primary access-code-create" type="button" onClick={createAccessCode} disabled={rotatingCode}><Key size={16} />{rotatingCode ? "Zugang wird erstellt" : "Zugangscode erstellen"}</button></div></div>
+                  <div className="access-code-config"><div className="access-code-config-heading"><span>Rolle beim Beitritt</span><p>Lege fest, welche Rechte eine Person mit diesem Code erhält.</p></div><AccessCodeRolePicker value={accessCodeRole} roles={accessCodeRoles} onChange={setAccessCodeRole} /><div className="access-code-actions"><div className="access-code-duration"><HourglassMedium size={17} /><span><strong>Eine Stunde gültig</strong><small>Ein neuer Code beendet den vorherigen sofort.</small></span></div><button className="button primary access-code-create" type="button" onClick={createAccessCode} disabled={rotatingCode}><Key size={16} />{rotatingCode ? "Zugang wird erstellt" : "Zugangscode erstellen"}</button></div></div>
                 </div>
               </SettingsSection>}
               <div className="settings-actions"><button className="button primary" type="submit">Änderungen speichern</button></div>
@@ -153,7 +156,7 @@ export function SettingsPage() {
           )}
           {tab === "Konto" && (
             <form onSubmit={saveAccount}>
-              <SettingsSection title="Persönliches Profil" description="Deine Angaben werden an Appteilen und Updates angezeigt.">
+              <SettingsSection title="Persönliches Profil" description="Deine Angaben werden an Komponenten und Updates angezeigt.">
                 <div className="identity-upload-row"><Avatar user={currentUser} size="large" /><div><strong>Profilbild</strong><small>Ohne Bild wird automatisch ein PNG mit deinen Initialen erstellt.</small><label className="button secondary upload-control"><UploadSimple size={15} />{uploadingAvatar ? "Bild wird verarbeitet" : "Bild auswählen"}<input type="file" accept="image/png,image/jpeg,image/webp" disabled={uploadingAvatar} onChange={(event) => void uploadAvatar(event.target.files?.[0])} /></label></div></div>
                 <div className="form-grid"><div className="field-group"><label htmlFor="account-first-name">Vorname</label><input id="account-first-name" value={accountInput.firstName} onChange={(event) => setAccountInput({ ...accountInput, firstName: event.target.value })} autoComplete="given-name" required /></div><div className="field-group"><label htmlFor="account-last-name">Nachname</label><input id="account-last-name" value={accountInput.lastName} onChange={(event) => setAccountInput({ ...accountInput, lastName: event.target.value })} autoComplete="family-name" required /></div></div>
                 <div className="field-group"><label htmlFor="account-job">Rolle im Team</label><input id="account-job" value={accountInput.jobTitle} onChange={(event) => setAccountInput({ ...accountInput, jobTitle: event.target.value })} /></div>
@@ -165,7 +168,7 @@ export function SettingsPage() {
           {tab === "Benachrichtigungen" && (
             <div className="notification-settings">
               <SettingsSection title="Persönliche Hinweise" description="Lege fest, wann Modulane dich über Veränderungen informiert.">
-                <ToggleRow checked={workspaceInput.emailNotifications} disabled={notificationSaveState === "saving"} onChange={(checked) => void saveNotificationPreference("emailNotifications", checked)} title="E Mail Benachrichtigungen" description="Erhalte Hinweise zu Zuweisungen, Erwähnungen und blockierten Appteilen." />
+                <ToggleRow checked={workspaceInput.emailNotifications} disabled={notificationSaveState === "saving"} onChange={(checked) => void saveNotificationPreference("emailNotifications", checked)} title="E Mail Benachrichtigungen" description="Erhalte Hinweise zu Zuweisungen, Erwähnungen und blockierten Komponenten." />
                 <ToggleRow checked={workspaceInput.weeklyDigest} disabled={notificationSaveState === "saving"} onChange={(checked) => void saveNotificationPreference("weeklyDigest", checked)} title="Wöchentliche Zusammenfassung" description="Erhalte einmal pro Woche einen Überblick über alle aktiven Projekte." />
                 <div className={`autosave-status ${notificationSaveState}`} aria-live="polite">{notificationSaveState === "saving" ? "Wird gespeichert" : notificationSaveState === "error" ? "Speichern fehlgeschlagen" : "Änderungen werden automatisch gespeichert"}</div>
               </SettingsSection>

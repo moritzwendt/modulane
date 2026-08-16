@@ -21,6 +21,7 @@ import type {
   WorkspaceData,
   WorkspaceSettings,
 } from "../domain/types"
+import { joinCodeRoles } from "../domain/permissions"
 import { supabase } from "../lib/supabase"
 import { initialsForName, prepareSquarePng } from "../utils/identityImage"
 import { useAuth } from "./AuthContext"
@@ -49,6 +50,7 @@ interface WorkspaceContextValue extends WorkspaceData {
   addAppPartCommit(appPartId: string, input: CommitInput): Promise<void>
   inviteUser(input: UserInput): Promise<void>
   updateUserRole(userId: string, role: UserRole): Promise<void>
+  removeUser(userId: string): Promise<void>
   updateUser(userId: string, updates: Partial<UserInput>): Promise<void>
   uploadUserAvatar(file: File): Promise<string>
   uploadOrganizationLogo(file: File): Promise<string>
@@ -102,7 +104,7 @@ const edgeFunctionErrorMessage = async (error: unknown, fallback: string) => {
   return error && typeof error === "object" && "message" in error && typeof error.message === "string" ? error.message : fallback
 }
 
-export const joinCodeRoles: JoinCodeRole[] = ["Administrator", "Mitglied", "Gast"]
+export { joinCodeRoles }
 
 const isUnauthorizedFunctionError = (error: unknown) => error && typeof error === "object" && "context" in error && error.context instanceof Response && error.context.status === 401
 
@@ -185,17 +187,19 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       const featureRows = featuresResult.data ?? []
       const appPartIds = appPartRows.map((item) => item.id)
       const featureIds = featureRows.map((item) => item.id)
-      const [activeUsersResult, commitsResult, featureMembersResult, requirementsResult, updatesResult] = await Promise.all([
+      const [activeUsersResult, commitsResult, featureMembersResult, featureAppPartsResult, requirementsResult, updatesResult] = await Promise.all([
         appPartIds.length ? supabase.from("app_part_active_users").select("app_part_id, user_id").in("app_part_id", appPartIds) : Promise.resolve({ data: [], error: null }),
         appPartIds.length ? supabase.from("app_part_commits").select("*").in("app_part_id", appPartIds).order("created_at", { ascending: false }) : Promise.resolve({ data: [], error: null }),
         featureIds.length ? supabase.from("feature_members").select("feature_id, user_id, role").in("feature_id", featureIds) : Promise.resolve({ data: [], error: null }),
+        featureIds.length ? supabase.from("feature_app_parts").select("feature_id, app_part_id").in("feature_id", featureIds) : Promise.resolve({ data: [], error: null }),
         featureIds.length ? supabase.from("requirements").select("*").in("feature_id", featureIds).order("created_at") : Promise.resolve({ data: [], error: null }),
         featureIds.length ? supabase.from("feature_updates").select("*").in("feature_id", featureIds).order("created_at", { ascending: false }) : Promise.resolve({ data: [], error: null }),
       ])
-      ;[activeUsersResult, commitsResult, featureMembersResult, requirementsResult, updatesResult].forEach((result) => throwIfError(result.error))
+      ;[activeUsersResult, commitsResult, featureMembersResult, featureAppPartsResult, requirementsResult, updatesResult].forEach((result) => throwIfError(result.error))
       const activeUserRows = activeUsersResult.data ?? []
       const commitRows = commitsResult.data ?? []
       const featureMemberRows = featureMembersResult.data ?? []
+      const featureAppPartRows = featureAppPartsResult.data ?? []
       const requirementRows = requirementsResult.data ?? []
       const updateRows = updatesResult.data ?? []
       const roleByUser = new Map(memberRows.map((item) => [item.user_id, item.role]))
@@ -251,7 +255,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         status: feature.status,
         priority: feature.priority,
         health: feature.health,
-        appPartId: feature.app_part_id ?? "",
+        appPartIds: featureAppPartRows.filter((item) => item.feature_id === feature.id).map((item) => item.app_part_id),
         startDate: feature.start_date ?? "",
         targetDate: feature.target_date ?? "",
         estimate: feature.estimate,
@@ -340,11 +344,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       if (!user) throw new Error("Du bist nicht angemeldet.")
       const project = data.projects.find((item) => item.id === input.projectId)
       if (!project) throw new Error("Projekt wurde nicht gefunden.")
-      const feature: Feature = { id: crypto.randomUUID(), projectId: input.projectId, key: projectCode(project, data.features), title: input.title, description: input.description, status: input.status, priority: input.priority, health: "Im Plan", appPartId: input.appPartId, startDate: new Date().toISOString().slice(0, 10), targetDate: input.targetDate, estimate: "Noch offen", members: input.memberIds.map((userId, index) => ({ userId, role: index === 0 ? "Lead" : "Beteiligte" })), requirements: [], updates: [], createdAt: new Date().toISOString() }
-      const featureResult = await supabase.from("features").insert({ id: feature.id, project_id: feature.projectId, app_part_id: feature.appPartId || null, key: feature.key, title: feature.title, description: feature.description, status: feature.status, priority: feature.priority, health: feature.health, start_date: feature.startDate, target_date: feature.targetDate || null, estimate: feature.estimate, created_by: user.id })
+      const feature: Feature = { id: crypto.randomUUID(), projectId: input.projectId, key: projectCode(project, data.features), title: input.title, description: input.description, status: input.status, priority: input.priority, health: "Im Plan", appPartIds: input.appPartIds, startDate: new Date().toISOString().slice(0, 10), targetDate: input.targetDate, estimate: "Noch offen", members: input.memberIds.map((userId, index) => ({ userId, role: index === 0 ? "Lead" : "Beteiligte" })), requirements: [], updates: [], createdAt: new Date().toISOString() }
+      const featureResult = await supabase.from("features").insert({ id: feature.id, project_id: feature.projectId, key: feature.key, title: feature.title, description: feature.description, status: feature.status, priority: feature.priority, health: feature.health, start_date: feature.startDate, target_date: feature.targetDate || null, estimate: feature.estimate, created_by: user.id })
       throwIfError(featureResult.error)
       const membersResult = await supabase.from("feature_members").insert(feature.members.map((member) => ({ feature_id: feature.id, user_id: member.userId, role: member.role })))
       throwIfError(membersResult.error)
+      if (feature.appPartIds.length) throwIfError((await supabase.from("feature_app_parts").insert(feature.appPartIds.map((appPartId) => ({ feature_id: feature.id, app_part_id: appPartId })))).error)
       setData((current) => ({ ...current, features: [...current.features, feature] }))
       return feature
     },
@@ -381,9 +386,18 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setData((current) => ({ ...current, settings: { ...current.settings, ...updates } }))
     },
     async updateFeature(featureId, updates) {
-      const payload = { app_part_id: updates.appPartId === "" ? null : updates.appPartId, title: updates.title, description: updates.description, status: updates.status, priority: updates.priority, health: updates.health, start_date: updates.startDate || undefined, target_date: updates.targetDate === "" ? null : updates.targetDate, estimate: updates.estimate }
+      const payload = { title: updates.title, description: updates.description, status: updates.status, priority: updates.priority, health: updates.health, start_date: updates.startDate || undefined, target_date: updates.targetDate === "" ? null : updates.targetDate, estimate: updates.estimate }
       const cleaned = Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== undefined))
       throwIfError((await supabase.from("features").update(cleaned).eq("id", featureId)).error)
+      if (updates.appPartIds) {
+        const currentIds = data.features.find((feature) => feature.id === featureId)?.appPartIds ?? []
+        const appPartIds = Array.from(new Set(updates.appPartIds))
+        const addedIds = appPartIds.filter((appPartId) => !currentIds.includes(appPartId))
+        const removedIds = currentIds.filter((appPartId) => !appPartIds.includes(appPartId))
+        if (addedIds.length) throwIfError((await supabase.from("feature_app_parts").insert(addedIds.map((appPartId) => ({ feature_id: featureId, app_part_id: appPartId })))).error)
+        if (removedIds.length) throwIfError((await supabase.from("feature_app_parts").delete().eq("feature_id", featureId).in("app_part_id", removedIds)).error)
+        updates = { ...updates, appPartIds }
+      }
       setData((current) => ({ ...current, features: current.features.map((feature) => feature.id === featureId ? { ...feature, ...updates } : feature) }))
     },
     async toggleRequirement(featureId, requirementId) {
@@ -440,8 +454,18 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       await reload()
     },
     async updateUserRole(userId, role) {
-      throwIfError((await supabase.from("workspace_members").update({ role }).eq("workspace_id", workspaceId).eq("user_id", userId)).error)
+      throwIfError((await supabase.rpc("change_workspace_member_role", { target_workspace_id: workspaceId, target_user_id: userId, new_role: role })).error)
       setData((current) => ({ ...current, users: current.users.map((item) => item.id === userId ? { ...item, role } : item) }))
+    },
+    async removeUser(userId) {
+      throwIfError((await supabase.rpc("remove_workspace_member", { target_workspace_id: workspaceId, target_user_id: userId })).error)
+      setData((current) => ({
+        ...current,
+        users: current.users.filter((item) => item.id !== userId),
+        projects: current.projects.map((project) => ({ ...project, memberIds: project.memberIds.filter((id) => id !== userId) })),
+        features: current.features.map((feature) => ({ ...feature, members: feature.members.filter((member) => member.userId !== userId) })),
+        appParts: current.appParts.map((part) => ({ ...part, activeUserIds: part.activeUserIds.filter((id) => id !== userId), ownerUserId: part.ownerUserId === userId ? "" : part.ownerUserId })),
+      }))
     },
     async updateUser(userId, updates) {
       const existingUser = data.users.find((item) => item.id === userId)

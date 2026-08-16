@@ -7,11 +7,12 @@ import { FeatureRow } from "../components/features/FeatureRow"
 import { AvatarGroup } from "../components/ui/Avatar"
 import { StatusBadge } from "../components/ui/StatusBadge"
 import type { FeatureStatus } from "../domain/types"
+import { canContributeToProject, organizationPermissions } from "../domain/permissions"
 import { featureStatuses, useWorkspace } from "../state/WorkspaceContext"
 
 export function ProjectPage() {
   const { projectId } = useParams()
-  const { projects, features, appParts, users } = useWorkspace()
+  const { projects, features, appParts, users, currentUserId, settings } = useWorkspace()
   const project = projects.find((item) => item.id === projectId)
   const [createOpen, setCreateOpen] = useState(false)
   const [createAppPartOpen, setCreateAppPartOpen] = useState(false)
@@ -28,6 +29,9 @@ export function ProjectPage() {
 
   if (!project) return <div className="page"><div className="empty-state"><strong>Projekt nicht gefunden</strong></div></div>
 
+  const currentUser = users.find((user) => user.id === currentUserId) ?? users[0]
+  const permissions = organizationPermissions(currentUser.role, settings)
+  const canContribute = canContributeToProject(currentUser.role, project, currentUserId)
   const projectUsers = users.filter((user) => project.memberIds.includes(user.id))
   const statusGroups = featureStatuses.filter((status) => projectFeatures.some((feature) => feature.status === status))
 
@@ -41,15 +45,15 @@ export function ProjectPage() {
         <div className="project-hero-actions">
           <AvatarGroup users={projectUsers} />
           <StatusBadge value={project.status} />
-          <Link className="button secondary" to={`/projects/${project.id}/settings`}><GearSix size={16} />Einstellungen</Link>
-          <button className="button secondary" type="button" onClick={() => setCreateAppPartOpen(true)}><Plus size={16} />App Teil</button>
-          <button className="button primary" type="button" onClick={() => setCreateOpen(true)}><Plus size={16} weight="bold" />Feature erstellen</button>
+          {permissions.canManageOrganization && <Link className="button secondary" to={`/projects/${project.id}/settings`}><GearSix size={16} />Einstellungen</Link>}
+          {permissions.canCreateComponents && <button className="button secondary" type="button" onClick={() => setCreateAppPartOpen(true)}><Plus size={16} />Komponente</button>}
+          {canContribute && <button className="button primary" type="button" onClick={() => setCreateOpen(true)}><Plus size={16} weight="bold" />Aufgabe erstellen</button>}
         </div>
       </div>
       <p className="project-description">{project.description}</p>
       <div className="project-meta-strip">
-        <span><strong>{features.filter((feature) => feature.projectId === project.id).length}</strong> Features</span>
-        <Link to="/product"><strong>{appParts.filter((appPart) => appPart.projectId === project.id).length}</strong> App Teile</Link>
+        <span><strong>{features.filter((feature) => feature.projectId === project.id).length}</strong> Aufgaben</span>
+        <Link to="/components"><strong>{appParts.filter((appPart) => appPart.projectId === project.id).length}</strong> Komponenten</Link>
         <span><strong>{projectUsers.length}</strong> Mitglieder</span>
         <span><strong>{project.platforms.join(", ")}</strong> Plattformen</span>
       </div>
@@ -67,18 +71,18 @@ export function ProjectPage() {
           </select>
         </div>
         <div className="toolbar-search">
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Features suchen" aria-label="Features suchen" />
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Aufgaben suchen" aria-label="Aufgaben suchen" />
         </div>
         <button className={alphabetical ? "toolbar-icon active" : "toolbar-icon"} type="button" aria-pressed={alphabetical} onClick={() => setAlphabetical((value) => !value)}><SortAscending size={16} />Alphabetisch</button>
       </div>
 
       {projectFeatures.length ? (
         view === "list" ? (
-          <section className="feature-list" aria-label="Features">
+          <section className="feature-list" aria-label="Aufgaben">
             {projectFeatures.map((feature) => <FeatureRow key={feature.id} feature={feature} users={users} />)}
           </section>
         ) : (
-          <section className="feature-board" aria-label="Feature Board">
+          <section className="feature-board" aria-label="Aufgaben Board">
             {statusGroups.map((status) => (
               <div className="board-column" key={status}>
                 <div className="board-column-heading"><StatusBadge value={status} /><span>{projectFeatures.filter((feature) => feature.status === status).length}</span></div>
@@ -88,7 +92,7 @@ export function ProjectPage() {
           </section>
         )
       ) : (
-        <div className="empty-state large-empty"><GridFour size={30} /><strong>Keine Features gefunden</strong><span>Ändere den Filter oder erstelle ein neues Feature.</span><button className="button primary" type="button" onClick={() => setCreateOpen(true)}>Feature erstellen</button></div>
+        <div className="empty-state large-empty"><GridFour size={30} /><strong>Keine Aufgaben gefunden</strong><span>Ändere den Filter oder erstelle eine neue Aufgabe.</span>{canContribute && <button className="button primary" type="button" onClick={() => setCreateOpen(true)}>Aufgabe erstellen</button>}</div>
       )}
 
       <CreateFeatureModal open={createOpen} onClose={() => setCreateOpen(false)} project={project} />
