@@ -911,12 +911,20 @@ kbd {
   flex: 0 0 auto;
   display: inline-grid;
   place-items: center;
+  overflow: hidden;
   border: 2px solid var(--surface);
   border-radius: 50%;
   background: var(--avatar-color);
   color: #ffffff;
   font-weight: 650;
   line-height: 1;
+}
+
+.identity-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .avatar-small {
@@ -2986,6 +2994,58 @@ kbd {
   flex-direction: column;
   gap: 16px;
   padding: 18px;
+}
+
+.identity-upload-row {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.identity-upload-row > .avatar,
+.organization-image {
+  width: 64px;
+  height: 64px;
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--surface-subtle);
+}
+
+.identity-upload-row > .avatar {
+  font-size: 16px;
+}
+
+.identity-upload-row > div > strong,
+.identity-upload-row > div > small {
+  display: block;
+}
+
+.identity-upload-row > div > strong {
+  font-size: 12px;
+}
+
+.identity-upload-row > div > small {
+  margin-top: 3px;
+  color: var(--text-tertiary);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.upload-control {
+  width: fit-content;
+  margin-top: 10px;
+}
+
+.upload-control input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
 }
 
 .settings-section-body .field-group input:not([type="checkbox"]),

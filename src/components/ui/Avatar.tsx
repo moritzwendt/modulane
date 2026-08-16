@@ -1,4 +1,5 @@
 import type { User } from "../../domain/types"
+import { IdentityImage } from "./IdentityImage"
 
 export function Avatar({ user, size = "medium" }: { user: User; size?: "small" | "medium" | "large" }) {
   return (
@@ -8,7 +9,7 @@ export function Avatar({ user, size = "medium" }: { user: User; size?: "small" |
       title={user.name}
       aria-label={user.name}
     >
-      {user.initials}
+      <IdentityImage name={user.name} imageUrl={user.avatarUrl} color={user.color} />
     </span>
   )
 }

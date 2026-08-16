@@ -32,10 +32,13 @@ export type ProjectVisibility = "Workspace" | "Privat"
 export interface User {
   id: string
   name: string
+  firstName: string
+  lastName: string
   handle: string
   email: string
   initials: string
   color: string
+  avatarUrl: string
   role: UserRole
   jobTitle: string
   lastActiveAt: string
@@ -122,6 +125,7 @@ export interface Project {
 
 export interface WorkspaceSettings {
   name: string
+  logoUrl: string
   slug: string
   visibility: WorkspaceVisibility
   allowMemberInvites: boolean
@@ -169,7 +173,8 @@ export interface AppPartInput {
 }
 
 export interface UserInput {
-  name: string
+  firstName: string
+  lastName: string
   email: string
   role: UserRole
   jobTitle: string

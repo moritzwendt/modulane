@@ -56,7 +56,7 @@ export function LoginPage() {
   }
 
   return (
-    <AuthLayout title="Willkommen zurück" description="Melde dich in deinem Workspace an.">
+    <AuthLayout title="Willkommen zurück" description="Melde dich in deiner Organisation an.">
       <form className="auth-form" onSubmit={submit}>
         <div className="field-group"><label htmlFor="login-email">E Mail Adresse</label><input id="login-email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" autoFocus /></div>
         <div className="field-group"><div className="field-label-row"><label htmlFor="login-password">Passwort</label><Link to="/forgot">Passwort vergessen</Link></div><div className="password-field"><input id="login-password" type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" /><button type="button" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? "Passwort ausblenden" : "Passwort anzeigen"}>{showPassword ? <EyeSlash size={16} /> : <Eye size={16} />}</button></div></div>
@@ -71,7 +71,7 @@ export function LoginPage() {
 export function RegisterPage() {
   const { isAuthenticated, register } = useAuth()
   const navigate = useNavigate()
-  const [input, setInput] = useState({ name: "", email: "", password: "" })
+  const [input, setInput] = useState({ firstName: "", lastName: "", email: "", password: "" })
   const [accepted, setAccepted] = useState(false)
   const [error, setError] = useState("")
   const [submitting, setSubmitting] = useState(false)
@@ -98,7 +98,7 @@ export function RegisterPage() {
   return (
     <AuthLayout title="Konto erstellen" description="Erstelle zuerst dein persönliches Modulane Konto.">
       <form className="auth-form" onSubmit={submit}>
-        <div className="field-group"><label htmlFor="register-name">Vollständiger Name</label><input id="register-name" value={input.name} onChange={(event) => setInput({ ...input, name: event.target.value })} autoFocus /></div>
+        <div className="form-grid"><div className="field-group"><label htmlFor="register-first-name">Vorname</label><input id="register-first-name" value={input.firstName} onChange={(event) => setInput({ ...input, firstName: event.target.value })} autoComplete="given-name" autoFocus /></div><div className="field-group"><label htmlFor="register-last-name">Nachname</label><input id="register-last-name" value={input.lastName} onChange={(event) => setInput({ ...input, lastName: event.target.value })} autoComplete="family-name" /></div></div>
         <div className="field-group"><label htmlFor="register-email">E Mail Adresse</label><input id="register-email" type="email" value={input.email} onChange={(event) => setInput({ ...input, email: event.target.value })} /></div>
         <div className="field-group"><label htmlFor="register-password">Passwort</label><input id="register-password" type="password" value={input.password} onChange={(event) => setInput({ ...input, password: event.target.value })} /><p className="field-helper">Mindestens acht Zeichen.</p></div>
         <label className="terms-choice"><input type="checkbox" checked={accepted} onChange={(event) => setAccepted(event.target.checked)} /><span className="custom-check">{accepted && <Check size={13} weight="bold" />}</span><span>Ich akzeptiere die Bedingungen und den Datenschutz.</span></label>

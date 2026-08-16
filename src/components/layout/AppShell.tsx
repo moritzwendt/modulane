@@ -21,7 +21,7 @@ import { Link, NavLink, useNavigate } from "react-router-dom"
 import { useAuth } from "../../state/AuthContext"
 import { useWorkspace } from "../../state/WorkspaceContext"
 import { Avatar } from "../ui/Avatar"
-import { BrandLogo } from "../ui/BrandLogo"
+import { IdentityImage } from "../ui/IdentityImage"
 import { Modal } from "../ui/Modal"
 
 const navigation = [
@@ -95,7 +95,7 @@ export function AppShell({ children, onCreateProject }: { children: ReactNode; o
       <a className="skip-link" href="#main-content">Zum Inhalt springen</a>
       <aside className={`sidebar ${sidebarOpen ? "sidebar-open" : ""}`}>
         <div className="workspace-switcher">
-          <span className="brand-mark"><BrandLogo /></span>
+          <span className="brand-mark"><IdentityImage name={settings.name} imageUrl={settings.logoUrl} color="#5f5f68" /></span>
           <div>
             <strong>Modulane</strong>
             <span>{settings.name}</span>
@@ -162,7 +162,7 @@ export function AppShell({ children, onCreateProject }: { children: ReactNode; o
                 <nav aria-label="Benutzereinstellungen">
                   <Link to="/settings?tab=account" role="menuitem" onClick={() => setAccountMenuOpen(false)}><UserCircle size={17} /><span><strong>Mein Konto</strong><small>Profil und E Mail Adresse</small></span></Link>
                   <Link to="/settings?tab=notifications" role="menuitem" onClick={() => setAccountMenuOpen(false)}><Bell size={17} /><span><strong>Benachrichtigungen</strong><small>Persönliche Hinweise</small></span></Link>
-                  <Link to="/settings?tab=workspace" role="menuitem" onClick={() => setAccountMenuOpen(false)}><GearSix size={17} /><span><strong>Workspace Einstellungen</strong><small>Organisation und Zugänge</small></span></Link>
+                  <Link to="/settings?tab=workspace" role="menuitem" onClick={() => setAccountMenuOpen(false)}><GearSix size={17} /><span><strong>Organisationseinstellungen</strong><small>Profil und Zugänge</small></span></Link>
                 </nav>
                 <div className="account-menu-actions">
                   <button type="button" role="menuitem" onClick={() => setTheme(theme === "light" ? "dark" : "light")}>{theme === "light" ? <Moon size={17} /> : <Sun size={17} />}<span>{theme === "light" ? "Dunkles Design" : "Helles Design"}</span></button>
@@ -186,7 +186,7 @@ export function AppShell({ children, onCreateProject }: { children: ReactNode; o
         </header>
         <main id="main-content" className="main-content">{children}</main>
       </div>
-      <Modal open={searchOpen} onClose={() => { setSearchOpen(false); setSearchQuery("") }} title="Suchen" description="Finde Projekte, Features und App Teile im gesamten Workspace.">
+      <Modal open={searchOpen} onClose={() => { setSearchOpen(false); setSearchQuery("") }} title="Suchen" description="Finde Projekte, Features und App Teile in der gesamten Organisation.">
         <div className="global-search">
           <div className="global-search-input"><MagnifyingGlass size={17} /><label className="visually-hidden" htmlFor="global-search-input">Suchbegriff</label><input id="global-search-input" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Projekt, Feature oder App Teil suchen" autoFocus /></div>
           <div className="search-results">

@@ -20,6 +20,7 @@ import type {
   WorkspaceSettings,
 } from "../domain/types"
 import { supabase } from "../lib/supabase"
+import { initialsForName, prepareSquarePng } from "../utils/identityImage"
 import { useAuth } from "./AuthContext"
 
 interface WorkspaceContextValue extends WorkspaceData {
@@ -47,10 +48,13 @@ interface WorkspaceContextValue extends WorkspaceData {
   inviteUser(input: UserInput): Promise<void>
   updateUserRole(userId: string, role: UserRole): Promise<void>
   updateUser(userId: string, updates: Partial<UserInput>): Promise<void>
+  uploadUserAvatar(file: File): Promise<string>
+  uploadOrganizationLogo(file: File): Promise<string>
 }
 
 const emptySettings: WorkspaceSettings = {
   name: "",
+  logoUrl: "",
   slug: "",
   visibility: "Nur auf Einladung",
   allowMemberInvites: false,
@@ -154,10 +158,13 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       const users = profileRows.map((profile) => ({
         id: profile.id,
         name: profile.name,
+        firstName: profile.first_name,
+        lastName: profile.last_name,
         handle: profile.handle,
         email: profile.email,
         initials: profile.initials,
         color: profile.color,
+        avatarUrl: profile.avatar_url,
         role: roleByUser.get(profile.id) as UserRole,
         jobTitle: profile.job_title,
         lastActiveAt: profile.last_active_at,
@@ -218,6 +225,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         currentUserId: user.id,
         settings: {
           name: workspaceResult.data.name,
+          logoUrl: workspaceResult.data.logo_url,
           slug: workspaceResult.data.slug,
           visibility: workspaceResult.data.visibility,
           allowMemberInvites: workspaceResult.data.allow_member_invites,
@@ -227,7 +235,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         },
       })
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Workspace konnte nicht geladen werden.")
+      setError(caught instanceof Error ? caught.message : "Organisation konnte nicht geladen werden.")
     } finally {
       setLoading(false)
     }
@@ -268,7 +276,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       return result.code
     },
     async createProject(input) {
-      if (!user || !workspaceId) throw new Error("Workspace ist nicht bereit.")
+      if (!user || !workspaceId) throw new Error("Die Organisation ist nicht bereit.")
       const id = crypto.randomUUID()
       const prefix = input.name.replace(/[^A-Za-zÄÖÜäöüß]/g, "").slice(0, 3).toUpperCase() || "MOD"
       const project: Project = { id, name: input.name, description: input.description, type: input.type, platforms: input.platforms, status: data.settings.defaultProjectStatus, color: input.color, icon: input.name.trim().slice(0, 1).toUpperCase(), memberIds: input.memberIds, visibility: "Workspace", featurePrefix: prefix, repositoryName: "", autoArchiveDone: false, createdAt: new Date().toISOString() }
@@ -320,7 +328,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setData((current) => ({ ...current, projects: current.projects.map((project) => project.id === projectId ? { ...project, ...updates } : project) }))
     },
     async updateWorkspaceSettings(updates) {
-      const payload = { name: updates.name, slug: updates.slug, visibility: updates.visibility, allow_member_invites: updates.allowMemberInvites, email_notifications: updates.emailNotifications, weekly_digest: updates.weeklyDigest, default_project_status: updates.defaultProjectStatus }
+      const payload = { name: updates.name, logo_url: updates.logoUrl, slug: updates.slug, visibility: updates.visibility, allow_member_invites: updates.allowMemberInvites, email_notifications: updates.emailNotifications, weekly_digest: updates.weeklyDigest, default_project_status: updates.defaultProjectStatus }
       const cleaned = Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== undefined))
       throwIfError((await supabase.from("workspaces").update(cleaned).eq("id", workspaceId)).error)
       setData((current) => ({ ...current, settings: { ...current.settings, ...updates } }))
@@ -389,12 +397,36 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setData((current) => ({ ...current, users: current.users.map((item) => item.id === userId ? { ...item, role } : item) }))
     },
     async updateUser(userId, updates) {
-      const payload = { name: updates.name, email: updates.email, job_title: updates.jobTitle }
+      const existingUser = data.users.find((item) => item.id === userId)
+      const firstName = updates.firstName?.trim() ?? existingUser?.firstName ?? ""
+      const lastName = updates.lastName?.trim() ?? existingUser?.lastName ?? ""
+      const name = `${firstName} ${lastName}`.trim()
+      const payload = { name, first_name: firstName, last_name: lastName, initials: initialsForName(name), email: updates.email, job_title: updates.jobTitle }
       const cleaned = Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== undefined))
       if (userId === user?.id && updates.email && updates.email !== user.email) throwIfError((await supabase.auth.updateUser({ email: updates.email })).error)
       delete cleaned.email
       throwIfError((await supabase.from("profiles").update(cleaned).eq("id", userId)).error)
-      setData((current) => ({ ...current, users: current.users.map((item) => item.id === userId ? { ...item, ...updates } : item) }))
+      setData((current) => ({ ...current, users: current.users.map((item) => item.id === userId ? { ...item, ...updates, firstName, lastName, name, initials: initialsForName(name) } : item) }))
+    },
+    async uploadUserAvatar(file) {
+      if (!user) throw new Error("Du bist nicht angemeldet.")
+      const image = await prepareSquarePng(file)
+      const path = `profiles/${user.id}/avatar_${Date.now()}.png`
+      throwIfError((await supabase.storage.from("identity-assets").upload(path, image, { contentType: "image/png" })).error)
+      const avatarUrl = supabase.storage.from("identity-assets").getPublicUrl(path).data.publicUrl
+      throwIfError((await supabase.from("profiles").update({ avatar_url: avatarUrl }).eq("id", user.id)).error)
+      setData((current) => ({ ...current, users: current.users.map((item) => item.id === user.id ? { ...item, avatarUrl } : item) }))
+      return avatarUrl
+    },
+    async uploadOrganizationLogo(file) {
+      if (!workspaceId) throw new Error("Die Organisation ist nicht bereit.")
+      const image = await prepareSquarePng(file)
+      const path = `organizations/${workspaceId}/logo_${Date.now()}.png`
+      throwIfError((await supabase.storage.from("identity-assets").upload(path, image, { contentType: "image/png" })).error)
+      const logoUrl = supabase.storage.from("identity-assets").getPublicUrl(path).data.publicUrl
+      throwIfError((await supabase.from("workspaces").update({ logo_url: logoUrl }).eq("id", workspaceId)).error)
+      setData((current) => ({ ...current, settings: { ...current.settings, logoUrl } }))
+      return logoUrl
     },
   }), [data, error, loading, reload, user, workspaceId])
 

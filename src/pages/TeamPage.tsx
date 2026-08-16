@@ -29,7 +29,7 @@ export function TeamPage() {
     <div className="page">
       <div className="page-header"><div><h1>Team und Rollen</h1><p>Verwalte Zugriff, Verantwortlichkeiten und die aktuelle Arbeit deines Teams.</p></div><div className="header-actions"><button className="button primary" type="button" onClick={() => setInviteOpen(true)}><UserPlus size={16} />Person einladen</button></div></div>
       <div className="role-summary">
-        <div><ShieldCheck size={18} /><span><strong>Eigentümer</strong><small>Vollständige Kontrolle über Workspace und Abrechnung</small></span></div>
+        <div><ShieldCheck size={18} /><span><strong>Eigentümer</strong><small>Vollständige Kontrolle über Organisation und Abrechnung</small></span></div>
         <div><ShieldCheck size={18} /><span><strong>Administrator</strong><small>Verwaltet Projekte, Personen und Einstellungen</small></span></div>
         <div><ShieldCheck size={18} /><span><strong>Mitglied</strong><small>Erstellt Features und arbeitet an App Teilen</small></span></div>
         <div><ShieldCheck size={18} /><span><strong>Gast</strong><small>Sieht ausschließlich zugewiesene Projekte</small></span></div>
@@ -60,14 +60,14 @@ export function TeamPage() {
 }
 
 function InviteMemberModal({ open, onClose, onInvite }: { open: boolean; onClose(): void; onInvite(input: UserInput): Promise<void> }) {
-  const [input, setInput] = useState<UserInput>({ name: "", email: "", role: "Mitglied", jobTitle: "" })
+  const [input, setInput] = useState<UserInput>({ firstName: "", lastName: "", email: "", role: "Mitglied", jobTitle: "" })
   const [error, setError] = useState("")
 
   const [submitting, setSubmitting] = useState(false)
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
-    if (!input.name.trim() || !input.email.includes("@")) return setError("Name und gültige E Mail Adresse sind erforderlich.")
+    if (!input.firstName.trim() || !input.lastName.trim() || !input.email.includes("@")) return setError("Vorname, Nachname und eine gültige E Mail Adresse sind erforderlich.")
     setSubmitting(true)
     try {
       await onInvite(input)
@@ -76,7 +76,7 @@ function InviteMemberModal({ open, onClose, onInvite }: { open: boolean; onClose
       return setError("Die Einladung konnte nicht gesendet werden.")
     }
     setSubmitting(false)
-    setInput({ name: "", email: "", role: "Mitglied", jobTitle: "" })
+    setInput({ firstName: "", lastName: "", email: "", role: "Mitglied", jobTitle: "" })
     setError("")
     onClose()
   }
@@ -84,7 +84,8 @@ function InviteMemberModal({ open, onClose, onInvite }: { open: boolean; onClose
   return (
     <Modal open={open} onClose={onClose} title="Person einladen" description="Füge eine Person hinzu und lege ihre Rolle fest.">
       <form className="form-stack" onSubmit={submit}>
-        <div className="form-grid"><div className="field-group"><label htmlFor="invite-name">Name</label><input id="invite-name" value={input.name} onChange={(event) => setInput({ ...input, name: event.target.value })} autoFocus /></div><div className="field-group"><label htmlFor="invite-role">Rolle</label><select id="invite-role" value={input.role} onChange={(event) => setInput({ ...input, role: event.target.value as UserRole })}>{inviteRoles.map((role) => <option key={role}>{role}</option>)}</select></div></div>
+        <div className="form-grid"><div className="field-group"><label htmlFor="invite-first-name">Vorname</label><input id="invite-first-name" value={input.firstName} onChange={(event) => setInput({ ...input, firstName: event.target.value })} autoFocus /></div><div className="field-group"><label htmlFor="invite-last-name">Nachname</label><input id="invite-last-name" value={input.lastName} onChange={(event) => setInput({ ...input, lastName: event.target.value })} /></div></div>
+        <div className="field-group"><label htmlFor="invite-role">Rolle</label><select id="invite-role" value={input.role} onChange={(event) => setInput({ ...input, role: event.target.value as UserRole })}>{inviteRoles.map((role) => <option key={role}>{role}</option>)}</select></div>
         <div className="field-group"><label htmlFor="invite-email">E Mail Adresse</label><input id="invite-email" type="email" value={input.email} onChange={(event) => setInput({ ...input, email: event.target.value })} /></div>
         <div className="field-group"><label htmlFor="invite-job">Rolle im Team</label><input id="invite-job" value={input.jobTitle} onChange={(event) => setInput({ ...input, jobTitle: event.target.value })} placeholder="Zum Beispiel iOS Entwicklung" /></div>
         {error && <div className="form-alert" role="alert">{error}</div>}

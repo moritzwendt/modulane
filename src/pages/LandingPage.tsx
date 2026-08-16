@@ -123,14 +123,14 @@ export function LandingPage() {
         </section>
 
         <section className="landing-security" id="security">
-          <div><LockKey size={22} /><span><strong>Für echte Teams</strong><p>Rollen, private Projekte und geschützter Workspace Zugriff sind Teil des Systems.</p></span></div>
+          <div><LockKey size={22} /><span><strong>Für echte Teams</strong><p>Rollen, private Projekte und geschützter Organisationszugriff sind Teil des Systems.</p></span></div>
           <div><Sparkle size={22} /><span><strong>Gemeinsam und aktuell</strong><p>Alle Inhalte werden sicher gespeichert und stehen dem Team sofort zur Verfügung.</p></span></div>
         </section>
 
         <section className="landing-final-cta">
           <span className="landing-section-label">Bereit für dein nächstes Produkt</span>
           <h2>Bring Klarheit in jeden Teil deiner App.</h2>
-          <p>Erstelle deinen Workspace und sieh sofort, woran dein Team arbeitet.</p>
+          <p>Erstelle deine Organisation und sieh sofort, woran dein Team arbeitet.</p>
           <div><Link className="landing-button light" to={primaryTarget}>{primaryLabel}<ArrowRight size={16} /></Link>{!isAuthenticated && <Link className="landing-text-link light" to="/login">Bereits registriert</Link>}</div>
         </section>
       </main>

@@ -3,7 +3,8 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import { supabase } from "../lib/supabase"
 
 interface RegistrationInput {
-  name: string
+  firstName: string
+  lastName: string
   email: string
   password: string
 }
@@ -64,7 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { error: error ? messageForError(error.message) : null }
     },
     async register(input) {
-      if (input.name.trim().length < 2) return { error: "Bitte gib deinen vollständigen Namen ein." }
+      if (!input.firstName.trim() || !input.lastName.trim()) return { error: "Bitte gib deinen Vornamen und Nachnamen ein." }
       if (!input.email.includes("@")) return { error: "Bitte gib eine gültige E Mail Adresse ein." }
       if (input.password.length < 8) return { error: "Das Passwort muss mindestens acht Zeichen haben." }
       const { data, error } = await supabase.auth.signUp({
@@ -72,7 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         password: input.password,
         options: {
           emailRedirectTo: `${window.location.origin}/onboarding`,
-          data: { full_name: input.name.trim() },
+          data: { first_name: input.firstName.trim(), last_name: input.lastName.trim(), full_name: `${input.firstName.trim()} ${input.lastName.trim()}` },
         },
       })
       return { error: error ? messageForError(error.message) : null, confirmationRequired: !data.session }
