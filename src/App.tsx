@@ -2,6 +2,7 @@ import { useState } from "react"
 import { Navigate, Route, Routes } from "react-router-dom"
 import { CreateProjectModal } from "./components/forms/CreateProjectModal"
 import { AppShell } from "./components/layout/AppShell"
+import { WorkspaceLoader } from "./components/ui/WorkspaceLoader"
 import { useAuth } from "./state/AuthContext"
 import { useWorkspace } from "./state/WorkspaceContext"
 import { ForgotPasswordPage, LoginPage, RegisterPage, UpdatePasswordPage } from "./pages/AuthPages"
@@ -37,10 +38,10 @@ function WorkspaceApp() {
   const { workspaceId, currentUserId, loading: workspaceLoading, error } = useWorkspace()
   const [createProjectOpen, setCreateProjectOpen] = useState(false)
 
-  if (authLoading) return <div className="route-loading">Anmeldung wird geprüft</div>
+  if (authLoading) return <WorkspaceLoader label="Anmeldung wird geprüft" />
   if (!isAuthenticated) return <Navigate to="/login" replace />
-  if (currentUserId !== user?.id) return <div className="route-loading">Workspace wird geladen</div>
-  if (workspaceLoading) return <div className="route-loading">Workspace wird geladen</div>
+  if (currentUserId !== user?.id) return <WorkspaceLoader />
+  if (workspaceLoading) return <WorkspaceLoader />
   if (error) return <div className="route-loading">{error}</div>
   if (!workspaceId) return <Navigate to="/onboarding" replace />
 

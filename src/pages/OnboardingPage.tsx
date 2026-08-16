@@ -1,6 +1,7 @@
 import { ArrowLeft, ArrowRight, Buildings, Check, Copy, Key } from "@phosphor-icons/react"
 import { useState, type FormEvent } from "react"
 import { Navigate, useNavigate } from "react-router-dom"
+import { WorkspaceLoader } from "../components/ui/WorkspaceLoader"
 import { useAuth } from "../state/AuthContext"
 import { useWorkspace } from "../state/WorkspaceContext"
 import { AuthLayout } from "./AuthPages"
@@ -20,9 +21,9 @@ export function OnboardingPage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState("")
 
-  if (authLoading || workspaceLoading) return <div className="route-loading">Konto wird geladen</div>
+  if (authLoading || workspaceLoading) return <WorkspaceLoader label="Konto wird vorbereitet" />
   if (!isAuthenticated) return <Navigate to="/login" replace />
-  if (currentUserId !== user?.id) return <div className="route-loading">Konto wird geladen</div>
+  if (currentUserId !== user?.id) return <WorkspaceLoader label="Konto wird vorbereitet" />
   if (workspaceId && !createdCode) return <Navigate to="/dashboard" replace />
 
   const create = async (event: FormEvent) => {
