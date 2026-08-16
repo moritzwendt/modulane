@@ -3,9 +3,9 @@ import { useState, type FormEvent, type ReactNode } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { Avatar } from "../components/ui/Avatar"
 import { IdentityImage } from "../components/ui/IdentityImage"
-import type { ProjectStatus, WorkspaceVisibility } from "../domain/types"
+import type { JoinCodeRole, ProjectStatus, WorkspaceVisibility } from "../domain/types"
 import { useAuth } from "../state/AuthContext"
-import { projectStatuses, useWorkspace } from "../state/WorkspaceContext"
+import { joinCodeRoles, projectStatuses, useWorkspace } from "../state/WorkspaceContext"
 import { useToast } from "../state/ToastContext"
 
 type SettingsTab = "Workspace" | "Konto" | "Benachrichtigungen"
@@ -22,6 +22,8 @@ export function SettingsPage() {
   const [workspaceInput, setWorkspaceInput] = useState(settings)
   const [accountInput, setAccountInput] = useState({ firstName: currentUser.firstName, lastName: currentUser.lastName, email: currentUser.email, jobTitle: currentUser.jobTitle })
   const [accessCode, setAccessCode] = useState("")
+  const [accessCodeRole, setAccessCodeRole] = useState<JoinCodeRole>("Mitglied")
+  const [accessCodeExpiresAt, setAccessCodeExpiresAt] = useState("")
   const [rotatingCode, setRotatingCode] = useState(false)
   const [codeCopied, setCodeCopied] = useState(false)
   const [notificationSaveState, setNotificationSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle")
@@ -84,11 +86,13 @@ export function SettingsPage() {
   const createAccessCode = async () => {
     setRotatingCode(true)
     try {
-      const code = await rotateWorkspaceCode()
-      setAccessCode(code)
+      const result = await rotateWorkspaceCode(accessCodeRole)
+      setAccessCode(result.code)
+      setAccessCodeRole(result.role)
+      setAccessCodeExpiresAt(result.expiresAt)
       showToast("Neuer Zugangscode erstellt")
-    } catch {
-      showToast("Zugangscode konnte nicht erstellt werden", "info")
+    } catch (caught) {
+      showToast(caught instanceof Error ? caught.message : "Zugangscode konnte nicht erstellt werden", "info")
     } finally {
       setRotatingCode(false)
     }
@@ -144,8 +148,9 @@ export function SettingsPage() {
                 <ToggleRow checked={workspaceInput.allowMemberInvites} onChange={(checked) => setWorkspaceInput({ ...workspaceInput, allowMemberInvites: checked })} title="Einladungen durch Mitglieder" description="Mitglieder dürfen weitere Personen in die Organisation einladen." />
               </SettingsSection>
               {["Eigentümer", "Administrator"].includes(currentUser.role) && <SettingsSection title="Zugangscode" description="Mit diesem Code können neue Personen deiner Organisation beitreten.">
-                {accessCode ? <div className="access-code"><strong>{accessCode}</strong><button type="button" onClick={copyAccessCode}>{codeCopied ? <Check size={17} /> : <Copy size={17} />}{codeCopied ? "Kopiert" : "Kopieren"}</button></div> : <div className="settings-code-empty"><Key size={19} /><span><strong>Code geschützt</strong><small>Aus Sicherheitsgründen wird der aktuelle Code nicht im Klartext gespeichert.</small></span></div>}
-                <p className="field-helper">Ein neuer Code macht den bisherigen Zugangscode sofort ungültig.</p>
+                {accessCode ? <div className="access-code-result"><div className="access-code"><strong>{accessCode}</strong><button type="button" onClick={copyAccessCode}>{codeCopied ? <Check size={17} /> : <Copy size={17} />}{codeCopied ? "Kopiert" : "Kopieren"}</button></div><div className="access-code-meta"><span>Rolle: <strong>{accessCodeRole}</strong></span><span>Gültig bis <strong>{new Intl.DateTimeFormat("de-DE", { hour: "2-digit", minute: "2-digit" }).format(new Date(accessCodeExpiresAt))} Uhr</strong></span></div></div> : <div className="settings-code-empty"><Key size={19} /><span><strong>Kein sichtbarer Zugangscode</strong><small>Neue Codes werden einmalig angezeigt und laufen nach einer Stunde ab.</small></span></div>}
+                <div className="field-group access-code-role"><label htmlFor="access-code-role">Rolle für neue Mitglieder</label><select id="access-code-role" value={accessCodeRole} onChange={(event) => setAccessCodeRole(event.target.value as JoinCodeRole)}>{joinCodeRoles.map((role) => <option key={role}>{role}</option>)}</select><p className="field-helper">Die ausgewählte Rolle wird beim Beitritt automatisch vergeben.</p></div>
+                <p className="field-helper">Der Code ist eine Stunde gültig. Ein neuer Code macht den bisherigen sofort ungültig.</p>
                 <button className="button secondary" type="button" onClick={createAccessCode} disabled={rotatingCode}><Key size={16} />{rotatingCode ? "Code wird erstellt" : "Neuen Zugangscode erstellen"}</button>
               </SettingsSection>}
               <div className="settings-actions"><button className="button primary" type="submit">Änderungen speichern</button></div>

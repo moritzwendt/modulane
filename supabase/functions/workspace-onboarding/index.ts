@@ -12,6 +12,10 @@ const respond = (body: Record<string, unknown>, status = 200) => new Response(JS
 })
 
 const normalizeCode = (value: string) => value.toUpperCase().replace(/[^A-Z0-9]/g, "")
+const joinCodeRoles = ["Administrator", "Mitglied", "Gast"] as const
+type JoinCodeRole = typeof joinCodeRoles[number]
+
+const readJoinCodeRole = (value: unknown): JoinCodeRole | null => joinCodeRoles.includes(value as JoinCodeRole) ? value as JoinCodeRole : null
 
 const generateCode = () => {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
@@ -46,6 +50,8 @@ Deno.serve(async (request: Request) => {
     if (action === "create") {
       const name = String(body.name ?? "").trim()
       if (name.length < 2) return respond({ error: "Bitte gib der Organisation einen Namen." }, 400)
+      const role = readJoinCodeRole(body.role)
+      if (!role) return respond({ error: "Bitte wähle eine gültige Rolle für den Zugangscode." }, 400)
 
       const { count } = await adminClient.from("workspace_members").select("workspace_id", { count: "exact", head: true }).eq("user_id", userId)
       if ((count ?? 0) > 0) return respond({ error: "Dein Konto gehört bereits zu einer Organisation." }, 409)
@@ -71,17 +77,18 @@ Deno.serve(async (request: Request) => {
         throw memberError
       }
 
-      const { error: codeError } = await adminClient.from("workspace_join_codes").insert({
+      const { data: joinCode, error: codeError } = await adminClient.from("workspace_join_codes").insert({
         workspace_id: workspaceId,
         code_hash: codeHash,
         created_by: userId,
-      })
+        role,
+      }).select("expires_at").single()
       if (codeError) {
         await adminClient.from("workspaces").delete().eq("id", workspaceId)
         throw codeError
       }
 
-      return respond({ workspaceId, workspaceName: name, code: `${code.slice(0, 4)} ${code.slice(4)}` })
+      return respond({ workspaceId, workspaceName: name, code: `${code.slice(0, 4)} ${code.slice(4)}`, role, expiresAt: joinCode.expires_at })
     }
 
     if (action === "join") {
@@ -91,14 +98,14 @@ Deno.serve(async (request: Request) => {
       const code = normalizeCode(String(body.code ?? ""))
       if (code.length !== 8) return respond({ error: "Der Zugangscode besteht aus acht Zeichen." }, 400)
       const codeHash = await hashCode(code)
-      const { data: joinCode } = await adminClient.from("workspace_join_codes").select("workspace_id").eq("code_hash", codeHash).maybeSingle()
-      if (!joinCode) return respond({ error: "Dieser Zugangscode ist nicht gültig." }, 404)
+      const { data: joinCode } = await adminClient.from("workspace_join_codes").select("workspace_id, role, expires_at").eq("code_hash", codeHash).gt("expires_at", new Date().toISOString()).maybeSingle()
+      if (!joinCode) return respond({ error: "Dieser Zugangscode ist ungültig oder abgelaufen." }, 404)
 
       const { data: workspace } = await adminClient.from("workspaces").select("name").eq("id", joinCode.workspace_id).single()
       const { error: memberError } = await adminClient.from("workspace_members").insert({
         workspace_id: joinCode.workspace_id,
         user_id: userId,
-        role: "Mitglied",
+        role: joinCode.role,
       })
       if (memberError && memberError.code !== "23505") throw memberError
 
@@ -107,20 +114,23 @@ Deno.serve(async (request: Request) => {
 
     if (action === "rotate") {
       const workspaceId = String(body.workspaceId ?? "")
+      const role = readJoinCodeRole(body.role)
+      if (!role) return respond({ error: "Bitte wähle eine gültige Rolle für den Zugangscode." }, 400)
       const { data: membership } = await adminClient.from("workspace_members").select("role").eq("workspace_id", workspaceId).eq("user_id", userId).maybeSingle()
       if (!membership || !["Eigentümer", "Administrator"].includes(membership.role)) return respond({ error: "Du darfst den Zugangscode nicht ändern." }, 403)
 
       const code = generateCode()
       const codeHash = await hashCode(code)
-      const { error: codeError } = await adminClient.from("workspace_join_codes").upsert({
+      const { data: joinCode, error: codeError } = await adminClient.from("workspace_join_codes").upsert({
         workspace_id: workspaceId,
         code_hash: codeHash,
         created_by: userId,
         created_at: new Date().toISOString(),
-      }, { onConflict: "workspace_id" })
+        role,
+      }, { onConflict: "workspace_id" }).select("expires_at").single()
       if (codeError) throw codeError
 
-      return respond({ code: `${code.slice(0, 4)} ${code.slice(4)}` })
+      return respond({ code: `${code.slice(0, 4)} ${code.slice(4)}`, role, expiresAt: joinCode.expires_at })
     }
 
     return respond({ error: "Unbekannte Aktion" }, 400)

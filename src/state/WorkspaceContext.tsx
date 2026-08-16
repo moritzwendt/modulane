@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
 import type {
+  AccessCodeResult,
   AppPart,
   AppPartInput,
   CommitInput,
@@ -8,6 +9,7 @@ import type {
   FeatureMember,
   FeatureStatus,
   Health,
+  JoinCodeRole,
   Priority,
   Project,
   ProjectInput,
@@ -28,9 +30,9 @@ interface WorkspaceContextValue extends WorkspaceData {
   loading: boolean
   error: string
   reload(): Promise<void>
-  createWorkspace(name: string): Promise<{ code: string; workspaceName: string }>
+  createWorkspace(name: string, role: JoinCodeRole): Promise<AccessCodeResult & { workspaceName: string }>
   joinWorkspace(code: string): Promise<{ workspaceName: string }>
-  rotateWorkspaceCode(): Promise<string>
+  rotateWorkspaceCode(role: JoinCodeRole): Promise<AccessCodeResult>
   createProject(input: ProjectInput): Promise<Project>
   createFeature(input: FeatureInput): Promise<Feature>
   createAppPart(input: AppPartInput): Promise<AppPart>
@@ -87,6 +89,20 @@ const appPartCode = (project: Project, appParts: AppPart[]) => {
 const throwIfError = (error: { message: string } | null) => {
   if (error) throw new Error(error.message)
 }
+
+const edgeFunctionErrorMessage = async (error: unknown, fallback: string) => {
+  if (error && typeof error === "object" && "context" in error && error.context instanceof Response) {
+    try {
+      const body = await error.context.clone().json()
+      if (body && typeof body.error === "string") return body.error
+    } catch {
+      return "message" in error && typeof error.message === "string" ? error.message : fallback
+    }
+  }
+  return error && typeof error === "object" && "message" in error && typeof error.message === "string" ? error.message : fallback
+}
+
+export const joinCodeRoles: JoinCodeRole[] = ["Administrator", "Mitglied", "Gast"]
 
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const { user, isAuthenticated } = useAuth()
@@ -259,21 +275,24 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     loading,
     error,
     reload,
-    async createWorkspace(name) {
-      const { data: result, error: functionError } = await supabase.functions.invoke("workspace-onboarding", { body: { action: "create", name } })
-      if (functionError || result?.error) throw new Error(result?.error ?? functionError?.message ?? "Organisation konnte nicht erstellt werden.")
-      return { code: result.code, workspaceName: result.workspaceName }
+    async createWorkspace(name, role) {
+      const { data: result, error: functionError } = await supabase.functions.invoke("workspace-onboarding", { body: { action: "create", name, role } })
+      if (functionError) throw new Error(await edgeFunctionErrorMessage(functionError, "Organisation konnte nicht erstellt werden."))
+      if (result?.error) throw new Error(result.error)
+      return { code: result.code, workspaceName: result.workspaceName, role: result.role, expiresAt: result.expiresAt }
     },
     async joinWorkspace(code) {
       const { data: result, error: functionError } = await supabase.functions.invoke("workspace-onboarding", { body: { action: "join", code } })
-      if (functionError || result?.error) throw new Error(result?.error ?? functionError?.message ?? "Organisation konnte nicht gefunden werden.")
+      if (functionError) throw new Error(await edgeFunctionErrorMessage(functionError, "Organisation konnte nicht gefunden werden."))
+      if (result?.error) throw new Error(result.error)
       await reload()
       return { workspaceName: result.workspaceName }
     },
-    async rotateWorkspaceCode() {
-      const { data: result, error: functionError } = await supabase.functions.invoke("workspace-onboarding", { body: { action: "rotate", workspaceId } })
-      if (functionError || result?.error) throw new Error(result?.error ?? functionError?.message ?? "Zugangscode konnte nicht erstellt werden.")
-      return result.code
+    async rotateWorkspaceCode(role) {
+      const { data: result, error: functionError } = await supabase.functions.invoke("workspace-onboarding", { body: { action: "rotate", workspaceId, role } })
+      if (functionError) throw new Error(await edgeFunctionErrorMessage(functionError, "Zugangscode konnte nicht erstellt werden."))
+      if (result?.error) throw new Error(result.error)
+      return { code: result.code, role: result.role, expiresAt: result.expiresAt }
     },
     async createProject(input) {
       if (!user || !workspaceId) throw new Error("Die Organisation ist nicht bereit.")

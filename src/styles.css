@@ -116,6 +116,29 @@
   font-size: 12px;
 }
 
+.access-code-result {
+  display: grid;
+  gap: 9px;
+}
+
+.access-code-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 18px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.access-code-meta strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.access-code-role {
+  margin-top: 18px;
+}
+
 .settings-code-empty {
   display: flex;
   align-items: center;

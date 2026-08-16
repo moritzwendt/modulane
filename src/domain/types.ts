@@ -25,6 +25,7 @@ export type Priority = "Dringend" | "Hoch" | "Normal" | "Niedrig" | "Keine"
 export type Health = "Im Plan" | "Gefährdet" | "Blockiert"
 export type FeatureRole = "Lead" | "Beteiligte" | "Review"
 export type UserRole = "Eigentümer" | "Administrator" | "Mitglied" | "Gast"
+export type JoinCodeRole = Exclude<UserRole, "Eigentümer">
 export type ReleaseState = "Frei" | "In Entwicklung" | "Instabil" | "Stabil" | "Production Ready"
 export type WorkspaceVisibility = "Nur auf Einladung" | "Offen für die Organisation"
 export type ProjectVisibility = "Workspace" | "Privat"
@@ -42,6 +43,12 @@ export interface User {
   role: UserRole
   jobTitle: string
   lastActiveAt: string
+}
+
+export interface AccessCodeResult {
+  code: string
+  role: JoinCodeRole
+  expiresAt: string
 }
 
 export interface FeatureMember {
