@@ -179,6 +179,7 @@ export function AppShell({ children, onCreateProject }: { children: ReactNode; o
                     <span>{update.message}</span>
                   </Link>
                 ))}
+                {!recentNotifications.length && <p className="notification-empty">Keine neuen Benachrichtigungen</p>}
               </div>
             )}
           </div>

@@ -23,6 +23,7 @@ export function SettingsPage() {
   const [accessCode, setAccessCode] = useState("")
   const [rotatingCode, setRotatingCode] = useState(false)
   const [codeCopied, setCodeCopied] = useState(false)
+  const [notificationSaveState, setNotificationSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle")
 
   const saveWorkspace = async (event: FormEvent) => {
     event.preventDefault()
@@ -66,6 +67,20 @@ export function SettingsPage() {
     await navigator.clipboard.writeText(accessCode.replace(/\s/g, ""))
     setCodeCopied(true)
     window.setTimeout(() => setCodeCopied(false), 1800)
+  }
+
+  const saveNotificationPreference = async (key: "emailNotifications" | "weeklyDigest", value: boolean) => {
+    const previousValue = workspaceInput[key]
+    setWorkspaceInput((current) => ({ ...current, [key]: value }))
+    setNotificationSaveState("saving")
+    try {
+      await updateWorkspaceSettings({ [key]: value })
+      setNotificationSaveState("saved")
+    } catch {
+      setWorkspaceInput((current) => ({ ...current, [key]: previousValue }))
+      setNotificationSaveState("error")
+      showToast("Benachrichtigungseinstellung konnte nicht gespeichert werden", "info")
+    }
   }
 
   const tabs = [
@@ -115,13 +130,13 @@ export function SettingsPage() {
             </form>
           )}
           {tab === "Benachrichtigungen" && (
-            <form onSubmit={saveWorkspace}>
+            <div className="notification-settings">
               <SettingsSection title="Persönliche Hinweise" description="Lege fest, wann Modulane dich über Veränderungen informiert.">
-                <ToggleRow checked={workspaceInput.emailNotifications} onChange={(checked) => setWorkspaceInput({ ...workspaceInput, emailNotifications: checked })} title="E Mail Benachrichtigungen" description="Erhalte Hinweise zu Zuweisungen, Erwähnungen und blockierten Appteilen." />
-                <ToggleRow checked={workspaceInput.weeklyDigest} onChange={(checked) => setWorkspaceInput({ ...workspaceInput, weeklyDigest: checked })} title="Wöchentliche Zusammenfassung" description="Erhalte einmal pro Woche einen Überblick über alle aktiven Projekte." />
+                <ToggleRow checked={workspaceInput.emailNotifications} disabled={notificationSaveState === "saving"} onChange={(checked) => void saveNotificationPreference("emailNotifications", checked)} title="E Mail Benachrichtigungen" description="Erhalte Hinweise zu Zuweisungen, Erwähnungen und blockierten Appteilen." />
+                <ToggleRow checked={workspaceInput.weeklyDigest} disabled={notificationSaveState === "saving"} onChange={(checked) => void saveNotificationPreference("weeklyDigest", checked)} title="Wöchentliche Zusammenfassung" description="Erhalte einmal pro Woche einen Überblick über alle aktiven Projekte." />
+                <div className={`autosave-status ${notificationSaveState}`} aria-live="polite">{notificationSaveState === "saving" ? "Wird gespeichert" : notificationSaveState === "error" ? "Speichern fehlgeschlagen" : "Änderungen werden automatisch gespeichert"}</div>
               </SettingsSection>
-              <div className="settings-actions"><button className="button primary" type="submit">Benachrichtigungen speichern</button></div>
-            </form>
+            </div>
           )}
         </div>
       </div>
@@ -133,6 +148,6 @@ function SettingsSection({ title, description, children }: { title: string; desc
   return <section className="settings-section"><div className="settings-section-heading"><h2>{title}</h2><p>{description}</p></div><div className="settings-section-body">{children}</div></section>
 }
 
-function ToggleRow({ checked, onChange, title, description }: { checked: boolean; onChange(checked: boolean): void; title: string; description: string }) {
-  return <label className="toggle-row"><span><strong>{title}</strong><small>{description}</small></span><input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} /><span className="toggle-control">{checked && <Check size={12} weight="bold" />}</span></label>
+function ToggleRow({ checked, disabled = false, onChange, title, description }: { checked: boolean; disabled?: boolean; onChange(checked: boolean): void; title: string; description: string }) {
+  return <label className="toggle-row"><span><strong>{title}</strong><small>{description}</small></span><input type="checkbox" checked={checked} disabled={disabled} onChange={(event) => onChange(event.target.checked)} /><span className="toggle-control" /></label>
 }
