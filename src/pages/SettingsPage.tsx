@@ -1,6 +1,6 @@
 import { Bell, Buildings, Check, Copy, Key, UserCircle } from "@phosphor-icons/react"
 import { useState, type FormEvent, type ReactNode } from "react"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useSearchParams } from "react-router-dom"
 import { Avatar } from "../components/ui/Avatar"
 import type { ProjectStatus, WorkspaceVisibility } from "../domain/types"
 import { useAuth } from "../state/AuthContext"
@@ -14,8 +14,10 @@ export function SettingsPage() {
   const { logout } = useAuth()
   const { showToast } = useToast()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const currentUser = users.find((user) => user.id === currentUserId) ?? users[0]
-  const [tab, setTab] = useState<SettingsTab>("Workspace")
+  const requestedTab = searchParams.get("tab")
+  const tab: SettingsTab = requestedTab === "account" ? "Konto" : requestedTab === "notifications" ? "Benachrichtigungen" : "Workspace"
   const [workspaceInput, setWorkspaceInput] = useState(settings)
   const [accountInput, setAccountInput] = useState({ name: currentUser.name, email: currentUser.email, jobTitle: currentUser.jobTitle })
   const [accessCode, setAccessCode] = useState("")
@@ -72,12 +74,16 @@ export function SettingsPage() {
     { id: "Benachrichtigungen" as const, label: "Benachrichtigungen", icon: Bell },
   ]
 
+  const selectTab = (nextTab: SettingsTab) => {
+    setSearchParams({ tab: nextTab === "Konto" ? "account" : nextTab === "Benachrichtigungen" ? "notifications" : "workspace" }, { replace: true })
+  }
+
   return (
     <div className="page settings-page">
       <div className="page-header"><div><h1>Einstellungen</h1><p>Verwalte deinen Workspace, dein Konto und persönliche Hinweise.</p></div></div>
       <div className="settings-layout">
         <nav className="settings-nav" aria-label="Einstellungsbereiche">
-          {tabs.map(({ id, label, icon: Icon }) => <button key={id} className={tab === id ? "active" : ""} type="button" onClick={() => setTab(id)}><Icon size={16} />{label}</button>)}
+          {tabs.map(({ id, label, icon: Icon }) => <button key={id} className={tab === id ? "active" : ""} type="button" onClick={() => selectTab(id)}><Icon size={16} />{label}</button>)}
         </nav>
         <div className="settings-content">
           {tab === "Workspace" && (

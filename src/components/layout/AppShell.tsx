@@ -11,12 +11,15 @@ import {
   Moon,
   Plus,
   SidebarSimple,
+  SignOut,
   Sun,
+  UserCircle,
   Users,
   X,
 } from "@phosphor-icons/react"
-import { useEffect, useState, type ReactNode } from "react"
-import { Link, NavLink } from "react-router-dom"
+import { useEffect, useRef, useState, type ReactNode } from "react"
+import { Link, NavLink, useNavigate } from "react-router-dom"
+import { useAuth } from "../../state/AuthContext"
 import { useWorkspace } from "../../state/WorkspaceContext"
 import { Avatar } from "../ui/Avatar"
 import { Modal } from "../ui/Modal"
@@ -32,12 +35,16 @@ const navigation = [
 
 export function AppShell({ children, onCreateProject }: { children: ReactNode; onCreateProject(): void }) {
   const { projects, features, appParts, users, currentUserId, settings } = useWorkspace()
+  const { logout } = useAuth()
+  const navigate = useNavigate()
   const currentUser = users.find((user) => user.id === currentUserId) ?? users[0]
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [theme, setTheme] = useState(() => window.localStorage.getItem("modulane.theme") ?? "light")
+  const accountMenuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
@@ -54,6 +61,28 @@ export function AppShell({ children, onCreateProject }: { children: ReactNode; o
     window.addEventListener("keydown", handleShortcut)
     return () => window.removeEventListener("keydown", handleShortcut)
   }, [])
+
+  useEffect(() => {
+    if (!accountMenuOpen) return
+    const closeOnOutsideClick = (event: MouseEvent) => {
+      if (!accountMenuRef.current?.contains(event.target as Node)) setAccountMenuOpen(false)
+    }
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setAccountMenuOpen(false)
+    }
+    document.addEventListener("mousedown", closeOnOutsideClick)
+    window.addEventListener("keydown", closeOnEscape)
+    return () => {
+      document.removeEventListener("mousedown", closeOnOutsideClick)
+      window.removeEventListener("keydown", closeOnEscape)
+    }
+  }, [accountMenuOpen])
+
+  const signOut = async () => {
+    setAccountMenuOpen(false)
+    await logout()
+    navigate("/login")
+  }
 
   const normalizedQuery = searchQuery.trim().toLocaleLowerCase("de")
   const projectResults = normalizedQuery ? projects.filter((project) => `${project.name} ${project.description}`.toLocaleLowerCase("de").includes(normalizedQuery)) : projects
@@ -99,13 +128,12 @@ export function AppShell({ children, onCreateProject }: { children: ReactNode; o
         </nav>
 
         {currentUser && <div className="sidebar-footer">
-          <div className="user-switcher">
+          <div className="sidebar-user-summary">
             <Avatar user={currentUser} size="small" />
             <span>
               <strong>{currentUser.name}</strong>
               <small>{currentUser.role}</small>
             </span>
-            <CaretDown size={14} />
           </div>
         </div>}
       </aside>
@@ -123,14 +151,25 @@ export function AppShell({ children, onCreateProject }: { children: ReactNode; o
             <kbd>⌘ K</kbd>
           </button>
           <div className="topbar-actions">
-            <button className="icon-button" type="button" onClick={() => setTheme(theme === "light" ? "dark" : "light")} aria-label={theme === "light" ? "Dunkles Design aktivieren" : "Helles Design aktivieren"}>
-              {theme === "light" ? <Moon size={17} /> : <Sun size={17} />}
-            </button>
-            <button className="icon-button" type="button" aria-label="Benachrichtigungen" aria-expanded={notificationsOpen} onClick={() => setNotificationsOpen((value) => !value)}>
+            <button className="icon-button" type="button" aria-label="Benachrichtigungen" aria-expanded={notificationsOpen} onClick={() => { setNotificationsOpen((value) => !value); setAccountMenuOpen(false) }}>
               <Bell size={17} />
               {recentNotifications.length > 0 && <span className="notification-count">{recentNotifications.length}</span>}
             </button>
-            {currentUser && <Avatar user={currentUser} size="small" />}
+            {currentUser && <div className="account-menu-area" ref={accountMenuRef}>
+              <button className="account-menu-trigger" type="button" aria-label="Benutzermenü öffnen" aria-expanded={accountMenuOpen} aria-haspopup="menu" onClick={() => { setAccountMenuOpen((value) => !value); setNotificationsOpen(false) }}><Avatar user={currentUser} size="small" /><CaretDown size={12} /></button>
+              {accountMenuOpen && <div className="account-menu" role="menu">
+                <div className="account-menu-identity"><Avatar user={currentUser} size="large" /><div><strong>{currentUser.name}</strong><span>{currentUser.email}</span><small>{currentUser.role} in {settings.name}</small></div></div>
+                <nav aria-label="Benutzereinstellungen">
+                  <Link to="/settings?tab=account" role="menuitem" onClick={() => setAccountMenuOpen(false)}><UserCircle size={17} /><span><strong>Mein Konto</strong><small>Profil und E Mail Adresse</small></span></Link>
+                  <Link to="/settings?tab=notifications" role="menuitem" onClick={() => setAccountMenuOpen(false)}><Bell size={17} /><span><strong>Benachrichtigungen</strong><small>Persönliche Hinweise</small></span></Link>
+                  <Link to="/settings?tab=workspace" role="menuitem" onClick={() => setAccountMenuOpen(false)}><GearSix size={17} /><span><strong>Workspace Einstellungen</strong><small>Organisation und Zugänge</small></span></Link>
+                </nav>
+                <div className="account-menu-actions">
+                  <button type="button" role="menuitem" onClick={() => setTheme(theme === "light" ? "dark" : "light")}>{theme === "light" ? <Moon size={17} /> : <Sun size={17} />}<span>{theme === "light" ? "Dunkles Design" : "Helles Design"}</span></button>
+                  <button className="account-menu-signout" type="button" role="menuitem" onClick={signOut}><SignOut size={17} /><span>Abmelden</span></button>
+                </div>
+              </div>}
+            </div>}
             {notificationsOpen && (
               <div className="notification-popover">
                 <div><strong>Benachrichtigungen</strong><button type="button" onClick={() => setNotificationsOpen(false)} aria-label="Benachrichtigungen schließen"><X size={15} /></button></div>
