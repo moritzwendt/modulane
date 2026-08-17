@@ -45,8 +45,8 @@ interface WorkspaceContextValue extends WorkspaceData {
   addUpdate(featureId: string, message: string, health: Health): Promise<void>
   setFeatureMembers(featureId: string, members: FeatureMember[]): Promise<void>
   updateAppPart(appPartId: string, updates: Partial<AppPart>): Promise<void>
-  claimAppPart(appPartId: string): Promise<void>
-  setActiveAppPartUsers(appPartId: string, userIds: string[]): Promise<void>
+  startAppPartWork(appPartId: string): Promise<void>
+  stopAppPartWork(appPartId: string): Promise<void>
   addAppPartCommit(appPartId: string, input: CommitInput): Promise<void>
   inviteUser(input: UserInput): Promise<void>
   updateUserRole(userId: string, role: UserRole): Promise<void>
@@ -241,7 +241,6 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         description: part.description,
         platform: part.platform,
         releaseState: part.release_state,
-        ownerUserId: part.owner_user_id ?? "",
         activeUserIds: activeUserRows.filter((item) => item.app_part_id === part.id).map((item) => item.user_id),
         commits: commitRows.filter((item) => item.app_part_id === part.id).map((item) => ({ id: item.id, hash: item.hash, message: item.message, branch: item.branch, authorId: item.author_id, createdAt: item.created_at, url: item.url })),
         createdAt: part.created_at,
@@ -357,10 +356,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       if (!user) throw new Error("Du bist nicht angemeldet.")
       const project = data.projects.find((item) => item.id === input.projectId)
       if (!project) throw new Error("Projekt wurde nicht gefunden.")
-      const part: AppPart = { id: crypto.randomUUID(), projectId: input.projectId, key: appPartCode(project, data.appParts), name: input.name, description: input.description, platform: input.platform, releaseState: input.releaseState, ownerUserId: input.ownerUserId, activeUserIds: input.ownerUserId ? [input.ownerUserId] : [], commits: [], createdAt: new Date().toISOString() }
-      const partResult = await supabase.from("app_parts").insert({ id: part.id, project_id: part.projectId, key: part.key, name: part.name, description: part.description, platform: part.platform, release_state: part.releaseState, owner_user_id: part.ownerUserId || null, created_by: user.id })
+      const part: AppPart = { id: crypto.randomUUID(), projectId: input.projectId, key: appPartCode(project, data.appParts), name: input.name, description: input.description, platform: input.platform, releaseState: input.releaseState, activeUserIds: [], commits: [], createdAt: new Date().toISOString() }
+      const partResult = await supabase.from("app_parts").insert({ id: part.id, project_id: part.projectId, key: part.key, name: part.name, description: part.description, platform: part.platform, release_state: part.releaseState, created_by: user.id })
       throwIfError(partResult.error)
-      if (part.ownerUserId) throwIfError((await supabase.from("app_part_active_users").insert({ app_part_id: part.id, user_id: part.ownerUserId })).error)
       setData((current) => ({ ...current, appParts: [...current.appParts, part] }))
       return part
     },
@@ -426,21 +424,20 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setData((current) => ({ ...current, features: current.features.map((feature) => feature.id === featureId ? { ...feature, members } : feature) }))
     },
     async updateAppPart(appPartId, updates) {
-      const payload = { name: updates.name, description: updates.description, platform: updates.platform, release_state: updates.releaseState, owner_user_id: updates.ownerUserId === "" ? null : updates.ownerUserId }
+      const payload = { name: updates.name, description: updates.description, platform: updates.platform, release_state: updates.releaseState }
       const cleaned = Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== undefined))
       throwIfError((await supabase.from("app_parts").update(cleaned).eq("id", appPartId)).error)
       setData((current) => ({ ...current, appParts: current.appParts.map((part) => part.id === appPartId ? { ...part, ...updates } : part) }))
     },
-    async claimAppPart(appPartId) {
+    async startAppPartWork(appPartId) {
       if (!user) return
-      throwIfError((await supabase.from("app_parts").update({ owner_user_id: user.id }).eq("id", appPartId)).error)
-      throwIfError((await supabase.from("app_part_active_users").upsert({ app_part_id: appPartId, user_id: user.id })).error)
-      setData((current) => ({ ...current, appParts: current.appParts.map((part) => part.id === appPartId ? { ...part, ownerUserId: user.id, activeUserIds: Array.from(new Set([...part.activeUserIds, user.id])) } : part) }))
+      throwIfError((await supabase.from("app_part_active_users").insert({ app_part_id: appPartId, user_id: user.id })).error)
+      setData((current) => ({ ...current, appParts: current.appParts.map((part) => part.id === appPartId ? { ...part, activeUserIds: Array.from(new Set([...part.activeUserIds, user.id])) } : part) }))
     },
-    async setActiveAppPartUsers(appPartId, userIds) {
-      throwIfError((await supabase.from("app_part_active_users").delete().eq("app_part_id", appPartId)).error)
-      if (userIds.length) throwIfError((await supabase.from("app_part_active_users").insert(userIds.map((userId) => ({ app_part_id: appPartId, user_id: userId })))).error)
-      setData((current) => ({ ...current, appParts: current.appParts.map((part) => part.id === appPartId ? { ...part, activeUserIds: userIds } : part) }))
+    async stopAppPartWork(appPartId) {
+      if (!user) return
+      throwIfError((await supabase.from("app_part_active_users").delete().eq("app_part_id", appPartId).eq("user_id", user.id)).error)
+      setData((current) => ({ ...current, appParts: current.appParts.map((part) => part.id === appPartId ? { ...part, activeUserIds: part.activeUserIds.filter((userId) => userId !== user.id) } : part) }))
     },
     async addAppPartCommit(appPartId, input) {
       if (!user) return
@@ -464,7 +461,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         users: current.users.filter((item) => item.id !== userId),
         projects: current.projects.map((project) => ({ ...project, memberIds: project.memberIds.filter((id) => id !== userId) })),
         features: current.features.map((feature) => ({ ...feature, members: feature.members.filter((member) => member.userId !== userId) })),
-        appParts: current.appParts.map((part) => ({ ...part, activeUserIds: part.activeUserIds.filter((id) => id !== userId), ownerUserId: part.ownerUserId === userId ? "" : part.ownerUserId })),
+        appParts: current.appParts.map((part) => ({ ...part, activeUserIds: part.activeUserIds.filter((id) => id !== userId) })),
       }))
     },
     async updateUser(userId, updates) {
@@ -512,5 +509,5 @@ export function useWorkspace() {
 
 export const featureStatuses: FeatureStatus[] = ["Idee", "Geplant", "Bereit", "In Arbeit", "Im Review", "Blockiert", "Fertig"]
 export const priorities: Priority[] = ["Dringend", "Hoch", "Normal", "Niedrig", "Keine"]
-export const releaseStates = ["Frei", "In Entwicklung", "Instabil", "Stabil", "Production Ready"] as const
+export const releaseStates = ["In Entwicklung", "Instabil", "Stabil", "Production Ready"] as const
 export const projectStatuses: ProjectStatus[] = ["Geplant", "Aktiv", "Pausiert", "Abgeschlossen"]

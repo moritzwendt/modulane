@@ -55,11 +55,12 @@ function WorkspaceApp() {
         <Route path="/projects/:projectId/tasks/:featureId" element={<FeaturePage />} />
         <Route path="/components" element={<ProductPage />} />
         <Route path="/components/:appPartId" element={<AppPartPage />} />
-        <Route path="/my-tasks" element={<MyFeaturesPage />} />
+        <Route path="/tasks" element={<MyFeaturesPage />} />
+        <Route path="/my-tasks" element={<Navigate to="/tasks" replace />} />
         <Route path="/projects/:projectId/features/:featureId" element={<LegacyTaskRedirect />} />
         <Route path="/product" element={<Navigate to="/components" replace />} />
         <Route path="/product/app-parts/:appPartId" element={<LegacyComponentRedirect />} />
-        <Route path="/my-features" element={<Navigate to="/my-tasks" replace />} />
+        <Route path="/my-features" element={<Navigate to="/tasks" replace />} />
         <Route path="/team" element={<TeamPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />

@@ -1,4 +1,4 @@
-import { ArrowLeft, CalendarBlank, Check, CheckCircle, Cube, PencilSimple, Plus, UserPlus, X } from "@phosphor-icons/react"
+import { ArrowLeft, CalendarBlank, Check, CheckCircle, Cube, PencilSimple, Plus, UserPlus, Warning, X } from "@phosphor-icons/react"
 import { useMemo, useState, type FormEvent } from "react"
 import { Link, useParams } from "react-router-dom"
 import { Avatar, AvatarGroup } from "../components/ui/Avatar"
@@ -15,7 +15,7 @@ type Tab = "Überblick" | "Anforderungen" | "Updates" | "Aktivität"
 
 export function FeaturePage() {
   const { projectId, featureId } = useParams()
-  const { projects, features, appParts, users, toggleRequirement, addRequirement, addUpdate, updateFeature, setFeatureMembers } = useWorkspace()
+  const { projects, features, appParts, users, currentUserId, toggleRequirement, addRequirement, addUpdate, updateFeature, setFeatureMembers } = useWorkspace()
   const { showToast } = useToast()
   const feature = features.find((item) => item.id === featureId)
   const project = projects.find((item) => item.id === projectId)
@@ -32,6 +32,11 @@ export function FeaturePage() {
   const featureUsers = users.filter((user) => feature.members.some((member) => member.userId === user.id))
   const projectAppParts = appParts.filter((appPart) => appPart.projectId === project.id)
   const linkedAppParts = projectAppParts.filter((appPart) => feature.appPartIds.includes(appPart.id))
+  const occupiedAppParts = linkedAppParts.filter((appPart) => appPart.activeUserIds.some((userId) => userId !== currentUserId))
+  const occupancySummary = occupiedAppParts.map((appPart) => {
+    const names = users.filter((user) => appPart.activeUserIds.includes(user.id) && user.id !== currentUserId).map((user) => user.name)
+    return `${appPart.name} wird von ${names.join(", ")} bearbeitet`
+  }).join(". ")
   const leadMember = feature.members.find((member) => member.role === "Lead")
   const lead = users.find((user) => user.id === leadMember?.userId)
   const progress = featureProgress(feature)
@@ -63,8 +68,9 @@ export function FeaturePage() {
         <p className="feature-summary">{feature.description}</p>
         <div className="task-context-bar">
           <div className="task-context-people"><span>Personen</span><button type="button" onClick={() => setMembersOpen(true)}><AvatarGroup users={featureUsers} limit={5} /><Plus size={14} /></button></div>
-          <div className="task-context-components"><span>Komponenten</span><div>{linkedAppParts.map((appPart) => <span className="task-component-chip" key={appPart.id}><Link to={`/components/${appPart.id}`}><Cube size={14} />{appPart.name}</Link><button type="button" aria-label={`${appPart.name} entfernen`} onClick={() => { updateFeature(feature.id, { appPartIds: feature.appPartIds.filter((id) => id !== appPart.id) }); showToast("Komponente entfernt") }}><X size={12} /></button></span>)}<button className="task-add-context" type="button" onClick={() => setComponentsOpen(true)}><Plus size={14} />{linkedAppParts.length ? "Ergänzen" : "Verknüpfen"}</button></div></div>
+          <div className="task-context-components"><span>Komponenten</span><div>{linkedAppParts.map((appPart) => { const occupied = appPart.activeUserIds.some((userId) => userId !== currentUserId); return <span className={occupied ? "task-component-chip occupied" : "task-component-chip"} key={appPart.id}>{occupied && <Warning size={13} weight="fill" />}<Link to={`/components/${appPart.id}`}><Cube size={14} />{appPart.name}</Link><button type="button" aria-label={`${appPart.name} entfernen`} onClick={() => { updateFeature(feature.id, { appPartIds: feature.appPartIds.filter((id) => id !== appPart.id) }); showToast("Komponente entfernt") }}><X size={12} /></button></span> })}<button className="task-add-context" type="button" onClick={() => setComponentsOpen(true)}><Plus size={14} />{linkedAppParts.length ? "Ergänzen" : "Verknüpfen"}</button></div></div>
         </div>
+        {occupiedAppParts.length > 0 && <div className="component-work-warning" role="status"><Warning size={20} weight="fill" /><div><strong>{occupiedAppParts.length === 1 ? "Komponente bereits belegt" : "Komponenten bereits belegt"}</strong><span>{occupancySummary}. Stimme parallele Änderungen vorher ab.</span></div></div>}
         <div className="feature-tabs" role="tablist" aria-label="Aufgabenbereiche">{tabs.map((tab) => <button key={tab} type="button" role="tab" aria-selected={activeTab === tab} className={activeTab === tab ? "active" : ""} onClick={() => setActiveTab(tab)}>{tab}</button>)}</div>
       </div>
 
@@ -100,9 +106,10 @@ export function FeaturePage() {
 }
 
 function ComponentsModal({ open, onClose, appParts, selectedIds, onSave }: { open: boolean; onClose(): void; appParts: ReturnType<typeof useWorkspace>["appParts"]; selectedIds: string[]; onSave(ids: string[]): void }) {
+  const { users, currentUserId } = useWorkspace()
   const [selected, setSelected] = useState(selectedIds)
   const toggle = (id: string) => setSelected((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id])
-  return <Modal open={open} onClose={onClose} title="Komponenten verknüpfen" description="Wähle alle Komponenten aus, die durch diese Aufgabe verändert werden."><div className="component-choice-grid modal-component-grid">{appParts.map((appPart) => <button key={appPart.id} type="button" className={selected.includes(appPart.id) ? "component-choice selected" : "component-choice"} onClick={() => toggle(appPart.id)}><span><Cube size={16} /><span><strong>{appPart.name}</strong><small>{appPart.platform}</small></span></span>{selected.includes(appPart.id) ? <Check size={15} weight="bold" /> : <Plus size={15} />}</button>)}</div><div className="modal-actions"><button className="button secondary" type="button" onClick={onClose}>Abbrechen</button><button className="button primary" type="button" onClick={() => { onSave(selected); onClose() }}>Auswahl speichern</button></div></Modal>
+  return <Modal open={open} onClose={onClose} title="Komponenten verknüpfen"><div className="component-choice-grid modal-component-grid">{appParts.map((appPart) => { const activeUsers = users.filter((user) => appPart.activeUserIds.includes(user.id) && user.id !== currentUserId); return <button key={appPart.id} type="button" className={selected.includes(appPart.id) ? "component-choice selected" : "component-choice"} onClick={() => toggle(appPart.id)}><span><Cube size={16} /><span><strong>{appPart.name}</strong><small>{appPart.platform}</small>{activeUsers.length > 0 && <small className="component-occupancy"><Warning size={12} weight="fill" />Belegt von {activeUsers.map((user) => user.name).join(", ")}</small>}</span></span>{selected.includes(appPart.id) ? <Check size={15} weight="bold" /> : <Plus size={15} />}</button> })}</div><div className="modal-actions"><button className="button secondary" type="button" onClick={onClose}>Abbrechen</button><button className="button primary" type="button" onClick={() => { onSave(selected); onClose() }}>Auswahl speichern</button></div></Modal>
 }
 
 function RequirementsSection({ featureId, requirements, requirementTitle, setRequirementTitle, submitRequirement, toggleRequirement, compact = false }: { featureId: string; requirements: { id: string; title: string; completed: boolean }[]; requirementTitle: string; setRequirementTitle(value: string): void; submitRequirement(event: FormEvent): void; toggleRequirement(featureId: string, requirementId: string): void; compact?: boolean }) {

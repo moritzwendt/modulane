@@ -26,7 +26,7 @@ export type Health = "Im Plan" | "Gefährdet" | "Blockiert"
 export type FeatureRole = "Lead" | "Beteiligte" | "Review"
 export type UserRole = "owner" | "admin" | "member" | "guest"
 export type JoinCodeRole = Exclude<UserRole, "owner">
-export type ReleaseState = "Frei" | "In Entwicklung" | "Instabil" | "Stabil" | "Production Ready"
+export type ReleaseState = "In Entwicklung" | "Instabil" | "Stabil" | "Production Ready"
 export type WorkspaceVisibility = "Nur auf Einladung" | "Offen für die Organisation"
 export type ProjectVisibility = "Workspace" | "Privat"
 
@@ -107,7 +107,6 @@ export interface AppPart {
   description: string
   platform: string
   releaseState: ReleaseState
-  ownerUserId: string
   activeUserIds: string[]
   commits: FeatureCommit[]
   createdAt: string
@@ -176,7 +175,6 @@ export interface AppPartInput {
   description: string
   platform: string
   releaseState: ReleaseState
-  ownerUserId: string
 }
 
 export interface UserInput {

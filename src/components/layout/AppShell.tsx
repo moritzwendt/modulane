@@ -28,7 +28,7 @@ import { Modal } from "../ui/Modal"
 const navigation = [
   { to: "/dashboard", label: "Übersicht", icon: House },
   { to: "/components", label: "Komponenten", icon: Cube },
-  { to: "/my-tasks", label: "Meine Aufgaben", icon: ListChecks },
+  { to: "/tasks", label: "Aufgaben", icon: ListChecks },
   { to: "/projects", label: "Projekte", icon: FolderSimple },
   { to: "/team", label: "Team", icon: Users },
   { to: "/settings", label: "Einstellungen", icon: GearSix },

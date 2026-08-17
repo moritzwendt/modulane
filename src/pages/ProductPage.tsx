@@ -1,4 +1,4 @@
-import { ArrowRight, Cube, Plus, UserCirclePlus } from "@phosphor-icons/react"
+import { ArrowRight, Cube, Pause, Play, Plus } from "@phosphor-icons/react"
 import { useMemo, useState } from "react"
 import { Link } from "react-router-dom"
 import { CreateAppPartModal } from "../components/forms/CreateAppPartModal"
@@ -7,9 +7,11 @@ import { AppSelect } from "../components/ui/AppSelect"
 import { StatusBadge } from "../components/ui/StatusBadge"
 import { organizationPermissions } from "../domain/permissions"
 import { useWorkspace } from "../state/WorkspaceContext"
+import { useToast } from "../state/ToastContext"
 
 export function ProductPage() {
-  const { projects, appParts, features, users, currentUserId, settings, claimAppPart } = useWorkspace()
+  const { projects, appParts, features, users, currentUserId, settings, startAppPartWork, stopAppPartWork } = useWorkspace()
+  const { showToast } = useToast()
   const [createOpen, setCreateOpen] = useState(false)
   const [projectFilter, setProjectFilter] = useState("Alle")
   const currentUser = users.find((user) => user.id === currentUserId) ?? users[0]
@@ -26,7 +28,7 @@ export function ProductPage() {
         <div><strong>{appParts.length}</strong><span>Komponenten</span></div>
         <div><strong>{appParts.filter((appPart) => appPart.activeUserIds.length).length}</strong><span>In Bearbeitung</span></div>
         <div><strong>{appParts.filter((appPart) => appPart.releaseState === "Production Ready").length}</strong><span>Production Ready</span></div>
-        <div><strong>{appParts.filter((appPart) => !appPart.ownerUserId).length}</strong><span>Frei</span></div>
+        <div><strong>{appParts.filter((appPart) => !appPart.activeUserIds.length).length}</strong><span>Nicht belegt</span></div>
       </div>
       <div className="product-filter">
         <label htmlFor="product-project-filter">Projekt</label>
@@ -47,7 +49,7 @@ export function ProductPage() {
                   {parts.map((appPart) => {
                     const activeUsers = users.filter((user) => appPart.activeUserIds.includes(user.id))
                     const linkedFeatures = features.filter((feature) => feature.appPartIds.includes(appPart.id))
-                    const owner = users.find((user) => user.id === appPart.ownerUserId)
+                    const workingByMe = appPart.activeUserIds.includes(currentUserId)
                     return (
                       <article className="app-part-row" key={appPart.id}>
                         <Link className="app-part-row-link" to={`/components/${appPart.id}`}>
@@ -55,10 +57,10 @@ export function ProductPage() {
                           <div className="app-part-copy"><span>{appPart.key} <span className="inline-separator">/</span> {appPart.platform}</span><strong>{appPart.name}</strong><p>{appPart.description}</p></div>
                           <StatusBadge value={appPart.releaseState} />
                           <div className="app-part-feature-count"><strong>{linkedFeatures.length}</strong><span>{linkedFeatures.length === 1 ? "Aufgabe" : "Aufgaben"}</span></div>
-                          <div className="app-part-people">{activeUsers.length ? <><AvatarGroup users={activeUsers} /><span>Arbeitet gerade</span></> : owner ? <><AvatarGroup users={[owner]} /><span>Verantwortlich</span></> : <span>Niemand aktiv</span>}</div>
+                          <div className="app-part-people">{activeUsers.length ? <><AvatarGroup users={activeUsers} /><span>{activeUsers.length === 1 ? "Gerade belegt" : "Gemeinsam belegt"}</span></> : <span>Nicht belegt</span>}</div>
                           <ArrowRight size={15} />
                         </Link>
-                        {permissions.canCreateComponents && !appPart.ownerUserId && <button className="claim-inline" type="button" onClick={() => claimAppPart(appPart.id)}><UserCirclePlus size={15} />Beanspruchen</button>}
+                        {permissions.canCreateComponents && <button className={`claim-inline ${workingByMe ? "working" : activeUsers.length ? "occupied" : ""}`.trim()} type="button" onClick={() => void (workingByMe ? stopAppPartWork(appPart.id).then(() => showToast("Komponente freigegeben")) : startAppPartWork(appPart.id).then(() => showToast("Du arbeitest jetzt an der Komponente")))}>{workingByMe ? <><Pause size={15} />Freigeben</> : <><Play size={15} />{activeUsers.length ? "Auch daran arbeiten" : "Daran arbeiten"}</>}</button>}
                       </article>
                     )
                   })}

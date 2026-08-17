@@ -1,4 +1,4 @@
-import { Check, Cube, Plus, X } from "@phosphor-icons/react"
+import { Check, Cube, Plus, Warning, X } from "@phosphor-icons/react"
 import { useMemo, useState, type FormEvent } from "react"
 import { useNavigate } from "react-router-dom"
 import type { FeatureInput, FeatureStatus, Priority, Project } from "../../domain/types"
@@ -55,7 +55,7 @@ export function CreateFeatureModal({ open, onClose, project }: { open: boolean; 
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Aufgabe erstellen" description="Plane Verantwortung, Umfang und betroffene Komponenten an einem Ort.">
+    <Modal open={open} onClose={onClose} title="Aufgabe erstellen">
       <form className="form-stack task-create-form" onSubmit={submit}>
         {!project && <div className="field-group"><label htmlFor="feature-project">Projekt</label><AppSelect id="feature-project" value={input.projectId} onValueChange={selectProject} options={availableProjects.map((item) => ({ value: item.id, label: item.name, description: item.type }))} /></div>}
         <div className="field-group"><label htmlFor="feature-name">Was soll erledigt werden?</label><input id="feature-name" value={input.title} onChange={(event) => setInput({ ...input, title: event.target.value })} placeholder="Kurzer, konkreter Aufgabentitel" autoFocus />{error && <span className="field-error" role="alert">{error}</span>}</div>
@@ -67,9 +67,8 @@ export function CreateFeatureModal({ open, onClose, project }: { open: boolean; 
         <div className="field-group"><label htmlFor="feature-date">Zieltermin</label><input id="feature-date" type="date" value={input.targetDate} onChange={(event) => setInput({ ...input, targetDate: event.target.value })} /></div>
         <fieldset className="field-group component-selector">
           <legend>Betroffene Komponenten</legend>
-          <p className="field-helper">Wähle alle technischen Bereiche aus, die durch die Aufgabe verändert werden.</p>
           {input.appPartIds.length > 0 && <div className="selection-chips">{input.appPartIds.map((id) => { const part = projectAppParts.find((item) => item.id === id); return part && <button key={id} type="button" onClick={() => toggleAppPart(id)}><Cube size={14} />{part.name}<X size={13} /></button> })}</div>}
-          <div className="component-choice-grid">{projectAppParts.map((appPart) => <button key={appPart.id} type="button" className={input.appPartIds.includes(appPart.id) ? "component-choice selected" : "component-choice"} onClick={() => toggleAppPart(appPart.id)}><span><Cube size={16} /><span><strong>{appPart.name}</strong><small>{appPart.platform}</small></span></span>{input.appPartIds.includes(appPart.id) ? <Check size={15} weight="bold" /> : <Plus size={15} />}</button>)}{!projectAppParts.length && <span className="field-helper">In diesem Projekt gibt es noch keine Komponenten.</span>}</div>
+          <div className="component-choice-grid">{projectAppParts.map((appPart) => { const activeUsers = users.filter((user) => appPart.activeUserIds.includes(user.id) && user.id !== currentUserId); return <button key={appPart.id} type="button" className={input.appPartIds.includes(appPart.id) ? "component-choice selected" : "component-choice"} onClick={() => toggleAppPart(appPart.id)}><span><Cube size={16} /><span><strong>{appPart.name}</strong><small>{appPart.platform}</small>{activeUsers.length > 0 && <small className="component-occupancy"><Warning size={12} weight="fill" />Belegt von {activeUsers.map((user) => user.name).join(", ")}</small>}</span></span>{input.appPartIds.includes(appPart.id) ? <Check size={15} weight="bold" /> : <Plus size={15} />}</button> })}{!projectAppParts.length && <span className="field-helper">In diesem Projekt gibt es noch keine Komponenten.</span>}</div>
         </fieldset>
         <fieldset className="field-group"><legend>Beteiligte Personen</legend><p className="field-helper">Die zuerst gewählte Person übernimmt die Leitung. Weitere Personen können später jederzeit ergänzt werden.</p><div className="member-choices">{projectUsers.map((user) => <label key={user.id} className="member-choice"><Avatar user={user} size="small" /><span><strong>{user.name}</strong><small>@{user.handle}</small></span><input type="checkbox" checked={input.memberIds.includes(user.id)} onChange={() => toggleMember(user.id)} /></label>)}</div></fieldset>
         <div className="modal-actions"><button className="button secondary" type="button" onClick={onClose}>Abbrechen</button><button className="button primary" type="submit">Aufgabe erstellen</button></div>

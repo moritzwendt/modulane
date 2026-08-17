@@ -20,7 +20,6 @@ const toneByValue: Record<string, string> = {
   Keine: "neutral",
   "Im Plan": "green",
   Gefährdet: "amber",
-  Frei: "neutral",
   "In Entwicklung": "violet",
   Instabil: "red",
   Stabil: "blue",

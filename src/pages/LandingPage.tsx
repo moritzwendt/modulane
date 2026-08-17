@@ -20,8 +20,7 @@ import { BrandLogo } from "../components/ui/BrandLogo"
 import { useAuth } from "../state/AuthContext"
 
 const maturityStates = [
-  { name: "Frei", copy: "Die Komponente ist dokumentiert und kann übernommen werden.", color: "neutral" },
-  { name: "In Entwicklung", copy: "Lina und Moritz arbeiten gerade an Anmeldung und Sitzungen.", color: "violet" },
+  { name: "In Entwicklung", copy: "Die Kernstruktur entsteht und Schnittstellen verändern sich noch.", color: "violet" },
   { name: "Instabil", copy: "Die Kernfunktion steht, bekannte Risiken werden noch geschlossen.", color: "amber" },
   { name: "Stabil", copy: "Alle Anforderungen sind erfüllt und der Review ist abgeschlossen.", color: "blue" },
   { name: "Production Ready", copy: "Die Komponente ist geprüft, veröffentlicht und wird überwacht.", color: "green" },
@@ -30,7 +29,7 @@ const maturityStates = [
 export function LandingPage() {
   const { isAuthenticated } = useAuth()
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
-  const [maturityIndex, setMaturityIndex] = useState(1)
+  const [maturityIndex, setMaturityIndex] = useState(0)
   const primaryTarget = isAuthenticated ? "/dashboard" : "/register"
   const primaryLabel = isAuthenticated ? "Dashboard öffnen" : "Kostenlos starten"
   const selectedMaturity = maturityStates[maturityIndex]
@@ -55,7 +54,7 @@ export function LandingPage() {
       <main>
         <section className="landing-hero">
           <div className="hero-kicker"><span className="release-dot active" />Entwickelt für moderne Softwareteams</div>
-          <h1>Jeder Teil deiner App.<br />Klar verantwortet.</h1>
+          <h1>Jeder Teil deiner App.<br />Arbeit klar sichtbar.</h1>
           <p>Modulane zeigt, wer woran arbeitet, wie stabil eine Komponente ist und was noch bis zur Veröffentlichung fehlt. Ohne unnötige Verwaltungsebenen.</p>
           <div className="hero-actions"><Link className="landing-button" to={primaryTarget}>{primaryLabel}<ArrowRight size={16} /></Link><a className="landing-text-link" href="#product">Vorschau ansehen<ArrowRight size={15} /></a></div>
           <div className="hero-proof"><span><Check size={13} weight="bold" />Keine Kreditkarte</span><span><Check size={13} weight="bold" />In Minuten eingerichtet</span><span><Check size={13} weight="bold" />Für dein Team</span></div>
@@ -82,7 +81,7 @@ export function LandingPage() {
                 </div>
                 <div className="window-detail-grid">
                   <div className="window-requirements"><div><strong>Anforderungen</strong><span>3 von 5 erfüllt</span></div>{["Anmeldung mit E Mail", "Registrierung bestätigen", "Passwort zurücksetzen", "Sitzung sicher speichern"].map((item, index) => <p key={item} className={index < 2 ? "done" : ""}><i>{index < 2 && <Check size={10} weight="bold" />}</i>{item}</p>)}</div>
-                  <div className="window-properties"><p><span>Status</span><strong>In Arbeit</strong></p><p><span>Priorität</span><strong>Hoch</strong></p><p><span>Zustand</span><strong>In Entwicklung</strong></p><p><span>Komponenten Lead</span><strong><i>MW</i>Moritz</strong></p></div>
+                  <div className="window-properties"><p><span>Status</span><strong>In Arbeit</strong></p><p><span>Priorität</span><strong>Hoch</strong></p><p><span>Zustand</span><strong>In Entwicklung</strong></p><p><span>Gerade aktiv</span><strong><i>MW</i>Moritz</strong></p></div>
                 </div>
               </div>
             </div>
@@ -96,7 +95,7 @@ export function LandingPage() {
         </section>
 
         <section className="landing-principles">
-          <article><span>01</span><UsersThree size={21} /><h3>Verantwortung ist sichtbar</h3><p>Zugewiesene Personen und tatsächlich aktive Personen sind getrennt. So weiß dein Team immer, wer gerade übernimmt.</p></article>
+          <article><span>01</span><UsersThree size={21} /><h3>Aktive Arbeit ist sichtbar</h3><p>Das Team sieht direkt, wer gerade eine Komponente bearbeitet und wo Abstimmung nötig ist.</p></article>
           <article><span>02</span><Pulse size={21} /><h3>Reife ist eindeutig</h3><p>Arbeitsstatus und technische Stabilität haben eigene Zustände. Eine Komponente kann fertig entwickelt und trotzdem noch instabil sein.</p></article>
           <article><span>03</span><GitCommit size={21} /><h3>Code bleibt optional</h3><p>Verknüpfe Commits und Pull Requests nur dann, wenn sie wichtigen Kontext liefern. Die Komponente funktioniert auch ohne GitHub.</p></article>
         </section>
@@ -108,7 +107,7 @@ export function LandingPage() {
             <div className="maturity-rail" role="tablist" aria-label="Technischer Zustand">
               {maturityStates.map((state, index) => <button key={state.name} type="button" role="tab" aria-selected={maturityIndex === index} className={maturityIndex === index ? "active" : ""} onClick={() => setMaturityIndex(index)}><span>{index + 1}</span><strong>{state.name}</strong></button>)}
             </div>
-            <div className="maturity-detail"><span className={`maturity-icon ${selectedMaturity.color}`}><ShieldCheck size={22} /></span><div><small>Aktueller Zustand</small><h3>{selectedMaturity.name}</h3><p>{selectedMaturity.copy}</p></div><div className="maturity-owner"><span>VERANTWORTLICH</span><strong><i>LB</i>Lina Becker</strong></div></div>
+            <div className="maturity-detail"><span className={`maturity-icon ${selectedMaturity.color}`}><ShieldCheck size={22} /></span><div><small>Aktueller Zustand</small><h3>{selectedMaturity.name}</h3><p>{selectedMaturity.copy}</p></div><div className="maturity-owner"><span>GERADE AKTIV</span><strong><i>LB</i>Lina Becker</strong></div></div>
           </div>
         </section>
 

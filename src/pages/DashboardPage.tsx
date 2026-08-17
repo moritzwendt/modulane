@@ -10,7 +10,8 @@ export function DashboardPage({ onCreateProject }: { onCreateProject(): void }) 
   const { users, projects, features, currentUserId, settings } = useWorkspace()
   const currentUser = users.find((user) => user.id === currentUserId) ?? users[0]
   const permissions = organizationPermissions(currentUser.role, settings)
-  const myFeatures = features.filter((feature) => feature.members.some((member) => member.userId === currentUserId) && feature.status !== "Fertig")
+  const involvedProjectIds = new Set(projects.filter((project) => project.memberIds.includes(currentUserId)).map((project) => project.id))
+  const myFeatures = features.filter((feature) => involvedProjectIds.has(feature.projectId) && feature.status !== "Fertig")
   const urgentFeatures = features.filter((feature) => feature.priority === "Dringend" || feature.status === "Blockiert")
   const updates = features.flatMap((feature) => feature.updates.map((update) => ({ feature, update }))).sort((a, b) => b.update.createdAt.localeCompare(a.update.createdAt)).slice(0, 4)
 
@@ -35,8 +36,8 @@ export function DashboardPage({ onCreateProject }: { onCreateProject(): void }) 
       <div className="dashboard-grid">
         <section className="panel my-work-panel">
           <div className="panel-heading">
-            <div><h2>Meine Aufgaben</h2><span>{myFeatures.length} aktiv</span></div>
-            <Link to="/my-tasks">Alle anzeigen <ArrowRight size={15} /></Link>
+            <div><h2>Aufgaben</h2><span>{myFeatures.length} aktiv</span></div>
+            <Link to="/tasks">Alle anzeigen <ArrowRight size={15} /></Link>
           </div>
           <div className="compact-feature-list">
             {myFeatures.slice(0, 5).map((feature) => {
