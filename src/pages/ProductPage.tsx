@@ -3,6 +3,7 @@ import { useMemo, useState } from "react"
 import { Link } from "react-router-dom"
 import { CreateAppPartModal } from "../components/forms/CreateAppPartModal"
 import { AvatarGroup } from "../components/ui/Avatar"
+import { AppSelect } from "../components/ui/AppSelect"
 import { StatusBadge } from "../components/ui/StatusBadge"
 import { organizationPermissions } from "../domain/permissions"
 import { useWorkspace } from "../state/WorkspaceContext"
@@ -29,10 +30,7 @@ export function ProductPage() {
       </div>
       <div className="product-filter">
         <label htmlFor="product-project-filter">Projekt</label>
-        <select id="product-project-filter" value={projectFilter} onChange={(event) => setProjectFilter(event.target.value)}>
-          <option>Alle</option>
-          {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
-        </select>
+        <AppSelect compact id="product-project-filter" value={projectFilter} onValueChange={setProjectFilter} options={[{ value: "Alle", label: "Alle Projekte" }, ...projects.map((project) => ({ value: project.id, label: project.name, description: project.type }))]} />
       </div>
       <div className="product-projects">
         {visibleProjects.map((project) => {

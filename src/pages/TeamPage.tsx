@@ -2,6 +2,7 @@ import { Briefcase, Check, Cube, DotsThree, ListChecks, MagnifyingGlass, Plus, S
 import { useMemo, useState, type FormEvent } from "react"
 import { Link, Navigate } from "react-router-dom"
 import { Avatar } from "../components/ui/Avatar"
+import { AppSelect } from "../components/ui/AppSelect"
 import { Modal } from "../components/ui/Modal"
 import { assignableRoles, canManageMember, invitableRoles, organizationPermissions, organizationRoles, roleDescriptions, roleLabels } from "../domain/permissions"
 import type { JoinCodeRole, UserInput, UserRole } from "../domain/types"
@@ -81,7 +82,7 @@ export function TeamPage() {
           <div><h2>Mitglieder</h2><span>{visibleUsers.length} von {users.length}</span></div>
           <div className="team-directory-tools">
             <label className="team-search"><MagnifyingGlass size={15} /><span className="visually-hidden">Personen suchen</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Name oder E Mail Adresse" /></label>
-            <label className="team-role-filter"><span className="visually-hidden">Nach Rolle filtern</span><select value={roleFilter} onChange={(event) => setRoleFilter(event.target.value as UserRole | "all")}><option value="all">Alle Rollen</option>{organizationRoles.map((role) => <option key={role} value={role}>{roleLabels[role]}</option>)}</select></label>
+            <div className="team-role-filter"><AppSelect compact value={roleFilter} onValueChange={(role) => setRoleFilter(role as UserRole | "all")} ariaLabel="Nach Rolle filtern" options={[{ value: "all", label: "Alle Rollen" }, ...organizationRoles.map((role) => ({ value: role, label: roleLabels[role] }))]} /></div>
           </div>
         </div>
 
@@ -96,7 +97,7 @@ export function TeamPage() {
               <article key={user.id} className="team-member-row">
                 <div className="team-member-identity"><Avatar user={user} size="large" /><span><strong>{user.name}{user.id === currentUserId && <small>Du</small>}</strong><small>{user.jobTitle || `@${user.handle}`}</small></span></div>
                 <div className="team-member-role">
-                  {manageable ? <label className="role-select-shell" data-role={user.role}><span className="role-marker" /><select value={user.role} onChange={(event) => void changeRole(user.id, event.target.value as UserRole)} aria-label={`Rolle für ${user.name}`}>{assignableRoles(currentUser.role).map((role) => <option key={role} value={role}>{roleLabels[role]}</option>)}</select></label> : <span className="role-pill" data-role={user.role}>{roleLabels[user.role]}</span>}
+                  {manageable ? <div className="role-select-shell" data-role={user.role}><span className="role-marker" /><AppSelect compact value={user.role} onValueChange={(role) => void changeRole(user.id, role as UserRole)} ariaLabel={`Rolle für ${user.name}`} options={assignableRoles(currentUser.role).map((role) => ({ value: role, label: roleLabels[role], description: roleDescriptions[role] }))} /></div> : <span className="role-pill" data-role={user.role}>{roleLabels[user.role]}</span>}
                 </div>
                 <div className="team-member-work">
                   <span><ListChecks size={14} /><strong>{userFeatures.length}</strong> Aufgaben</span>

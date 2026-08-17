@@ -5,6 +5,7 @@ import { CreateFeatureModal } from "../components/forms/CreateFeatureModal"
 import { CreateAppPartModal } from "../components/forms/CreateAppPartModal"
 import { FeatureRow } from "../components/features/FeatureRow"
 import { AvatarGroup } from "../components/ui/Avatar"
+import { AppSelect } from "../components/ui/AppSelect"
 import { StatusBadge } from "../components/ui/StatusBadge"
 import type { FeatureStatus } from "../domain/types"
 import { canContributeToProject, organizationPermissions } from "../domain/permissions"
@@ -65,10 +66,7 @@ export function ProjectPage() {
         </div>
         <div className="toolbar-filter">
           <Funnel size={15} />
-          <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as FeatureStatus | "Alle")} aria-label="Nach Status filtern">
-            <option>Alle</option>
-            {featureStatuses.map((status) => <option key={status}>{status}</option>)}
-          </select>
+          <AppSelect compact value={statusFilter} onValueChange={(status) => setStatusFilter(status as FeatureStatus | "Alle")} ariaLabel="Nach Status filtern" options={[{ value: "Alle", label: "Alle Status" }, ...featureStatuses.map((status) => ({ value: status, label: status }))]} />
         </div>
         <div className="toolbar-search">
           <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Aufgaben suchen" aria-label="Aufgaben suchen" />

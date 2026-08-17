@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@phosphor-icons/react": "latest",
+    "@radix-ui/react-select": "^2.3.7",
     "@supabase/supabase-js": "2.56.1",
     "react": "latest",
     "react-dom": "latest",

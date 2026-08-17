@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom"
 import type { FeatureInput, FeatureStatus, Priority, Project } from "../../domain/types"
 import { featureStatuses, priorities, useWorkspace } from "../../state/WorkspaceContext"
 import { Avatar } from "../ui/Avatar"
+import { AppSelect } from "../ui/AppSelect"
 import { Modal } from "../ui/Modal"
 
 const emptyInput = (project: Project, currentUserId: string): FeatureInput => ({
@@ -56,12 +57,12 @@ export function CreateFeatureModal({ open, onClose, project }: { open: boolean; 
   return (
     <Modal open={open} onClose={onClose} title="Aufgabe erstellen" description="Plane Verantwortung, Umfang und betroffene Komponenten an einem Ort.">
       <form className="form-stack task-create-form" onSubmit={submit}>
-        {!project && <div className="field-group"><label htmlFor="feature-project">Projekt</label><select id="feature-project" value={input.projectId} onChange={(event) => selectProject(event.target.value)}>{availableProjects.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></div>}
+        {!project && <div className="field-group"><label htmlFor="feature-project">Projekt</label><AppSelect id="feature-project" value={input.projectId} onValueChange={selectProject} options={availableProjects.map((item) => ({ value: item.id, label: item.name, description: item.type }))} /></div>}
         <div className="field-group"><label htmlFor="feature-name">Was soll erledigt werden?</label><input id="feature-name" value={input.title} onChange={(event) => setInput({ ...input, title: event.target.value })} placeholder="Kurzer, konkreter Aufgabentitel" autoFocus />{error && <span className="field-error" role="alert">{error}</span>}</div>
         <div className="field-group"><label htmlFor="feature-description">Kontext</label><textarea id="feature-description" value={input.description} onChange={(event) => setInput({ ...input, description: event.target.value })} placeholder="Ziel, erwartetes Ergebnis und wichtige Hinweise" rows={3} /></div>
         <div className="form-grid">
-          <div className="field-group"><label htmlFor="feature-status">Status</label><select id="feature-status" value={input.status} onChange={(event) => setInput({ ...input, status: event.target.value as FeatureStatus })}>{featureStatuses.map((status) => <option key={status}>{status}</option>)}</select></div>
-          <div className="field-group"><label htmlFor="feature-priority">Priorität</label><select id="feature-priority" value={input.priority} onChange={(event) => setInput({ ...input, priority: event.target.value as Priority })}>{priorities.map((priority) => <option key={priority}>{priority}</option>)}</select></div>
+          <div className="field-group"><label htmlFor="feature-status">Status</label><AppSelect id="feature-status" value={input.status} onValueChange={(status) => setInput({ ...input, status: status as FeatureStatus })} options={featureStatuses.map((status) => ({ value: status, label: status }))} /></div>
+          <div className="field-group"><label htmlFor="feature-priority">Priorität</label><AppSelect id="feature-priority" value={input.priority} onValueChange={(priority) => setInput({ ...input, priority: priority as Priority })} options={priorities.map((priority) => ({ value: priority, label: priority }))} /></div>
         </div>
         <div className="field-group"><label htmlFor="feature-date">Zieltermin</label><input id="feature-date" type="date" value={input.targetDate} onChange={(event) => setInput({ ...input, targetDate: event.target.value })} /></div>
         <fieldset className="field-group component-selector">

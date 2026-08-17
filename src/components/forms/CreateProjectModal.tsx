@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom"
 import type { ProjectInput, ProjectType } from "../../domain/types"
 import { useWorkspace } from "../../state/WorkspaceContext"
 import { Avatar } from "../ui/Avatar"
+import { AppSelect } from "../ui/AppSelect"
 import { Modal } from "../ui/Modal"
 
 const projectTypes: ProjectType[] = ["Mobile App", "Web App", "Desktop App", "Website", "Backend", "API", "Bibliothek", "Browser Erweiterung", "Internes Tool", "Anderes"]
@@ -64,9 +65,7 @@ export function CreateProjectModal({ open, onClose }: { open: boolean; onClose()
         <div className="form-grid">
           <div className="field-group">
             <label htmlFor="project-type">Projekttyp</label>
-            <select id="project-type" value={input.type} onChange={(event) => setInput({ ...input, type: event.target.value as ProjectType })}>
-              {projectTypes.map((type) => <option key={type}>{type}</option>)}
-            </select>
+            <AppSelect id="project-type" value={input.type} onValueChange={(type) => setInput({ ...input, type: type as ProjectType })} options={projectTypes.map((type) => ({ value: type, label: type }))} />
           </div>
           <div className="field-group">
             <span className="field-label">Farbe</span>
