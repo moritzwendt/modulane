@@ -7,6 +7,7 @@ import { useAuth } from "./state/AuthContext"
 import { useWorkspace } from "./state/WorkspaceContext"
 import { ForgotPasswordPage, LoginPage, RegisterPage, UpdatePasswordPage } from "./pages/AuthPages"
 import { LandingPage } from "./pages/LandingPage"
+import { ImprintPage, PrivacyPage, TermsPage } from "./pages/LegalPages"
 import { DashboardPage } from "./pages/DashboardPage"
 import { FeaturePage } from "./pages/FeaturePage"
 import { MyFeaturesPage } from "./pages/MyFeaturesPage"
@@ -23,6 +24,9 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<LandingPage />} />
+      <Route path="/impressum" element={<ImprintPage />} />
+      <Route path="/datenschutz" element={<PrivacyPage />} />
+      <Route path="/agb" element={<TermsPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/forgot" element={<ForgotPasswordPage />} />
