@@ -1321,7 +1321,9 @@ kbd {
 :root[data-theme="dark"] .status-red { color: #eda0a6; }
 :root[data-theme="dark"] .status-green { color: #90c7b2; }
 
-.progress-ring {
+.progress-ring,
+.compact-feature .progress-ring,
+.feature-row .progress-ring {
   position: relative;
   flex: 0 0 auto;
   display: inline-grid;
